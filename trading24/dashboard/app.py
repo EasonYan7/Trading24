@@ -1603,8 +1603,30 @@ button[data-testid^="stBaseButton"]:focus-visible {
             padding: 0 !important; font-size: 14px !important;
             display: flex !important; align-items: center !important; justify-content: center !important;
         }
-        .st-key-ai_new_chat button { font-size: 12px !important; padding: 5px 8px !important; min-height: 30px !important; }
-        .st-key-ai_scope_toggle button { font-size: 12px !important; }
+        /* 头部图标按钮：新对话(加号) + 选择记录(列表) */
+        .st-key-ai_new_chat button, .st-key-ai_scope_toggle button {
+            width:32px !important; min-width:32px !important; height:30px !important; min-height:30px !important;
+            padding:0 !important; font-size:0 !important;
+            border:1px solid var(--t24-border) !important; border-radius:8px !important;
+            color:var(--t24-text) !important;
+            display:flex !important; align-items:center !important; justify-content:center !important;
+        }
+        .st-key-ai_new_chat button *, .st-key-ai_scope_toggle button * {
+            font-size:0 !important; line-height:0 !important; color:transparent !important;
+        }
+        .st-key-ai_new_chat button::before, .st-key-ai_scope_toggle button::before {
+            content:""; display:block; width:17px; height:17px; background:currentColor;
+            -webkit-mask-repeat:no-repeat; -webkit-mask-position:center; -webkit-mask-size:17px;
+            mask-repeat:no-repeat; mask-position:center; mask-size:17px;
+        }
+        .st-key-ai_new_chat button::before {
+            -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z'/%3E%3C/svg%3E");
+            mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z'/%3E%3C/svg%3E");
+        }
+        .st-key-ai_scope_toggle button::before {
+            -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
+            mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
+        }
         .st-key-t24_ai_panel textarea { font-size: 13px !important; }
         .st-key-t24_ai_panel [data-testid="stForm"] button { font-size: 13px !important; }
         [class*="st-key-ai_sugg_"] button { font-size: 12.5px !important; white-space: normal !important; text-align: left !important; padding: 7px 10px !important; }
@@ -3165,12 +3187,16 @@ def render_ai_plugin():
         scope_desc = f"全部关注列表 · {len(default_ids)} 只"
 
     with st.container(key="t24_ai_header"):
-        hc = st.columns([1, 3.2, 1.9], vertical_alignment="center")
+        hc = st.columns([0.9, 2.7, 0.8, 0.8], vertical_alignment="center")
         if hc[0].button("✕", key="ai_close", help="关闭"):
             st.session_state.ai_panel_open = False
             st.rerun()
         hc[1].markdown("<div class='t24-ai-title'>AI 助手</div>", unsafe_allow_html=True)
-        if hc[2].button("＋ 新对话", key="ai_new_chat", width="stretch"):
+        if hc[2].button("选择记录", key="ai_scope_toggle", width="stretch", help="选择分析记录",
+                        type="primary" if st.session_state.get("ai_show_advanced") else "secondary"):
+            st.session_state.ai_show_advanced = not st.session_state.get("ai_show_advanced", False)
+            st.rerun()
+        if hc[3].button("新对话", key="ai_new_chat", width="stretch", help="开始新对话"):
             st.session_state.ai_messages = []
             st.rerun()
 
@@ -3214,10 +3240,6 @@ def render_ai_plugin():
             if st.form_submit_button("发送", type="primary", width="stretch"):
                 _send_ai(user_prompt, effective_ids)
                 st.rerun()
-
-        if st.button("选择记录", key="ai_scope_toggle", width="stretch"):
-            st.session_state.ai_show_advanced = not st.session_state.get("ai_show_advanced", False)
-            st.rerun()
 
         # 高级：手动指定上下文（默认隐藏；留空=自动）
         if st.session_state.get("ai_show_advanced", False):
