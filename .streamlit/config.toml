@@ -1,0 +1,12 @@
+# Trading24 主题 — Agentic 设计系统
+[theme]
+base = "light"
+primaryColor = "#FF5701"
+backgroundColor = "#F6F6F1"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#111827"
+font = "serif"
+
+[server]
+headless = true
+port = 8501

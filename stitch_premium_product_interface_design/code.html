@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Deep Insights - TRADING24</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&amp;family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#002113",
+                        "on-secondary-container": "#ffaea8",
+                        "on-primary": "#003824",
+                        "surface": "#131314",
+                        "on-tertiary-fixed-variant": "#2f2ebe",
+                        "border-subtle": "#1F2937",
+                        "background": "#131314",
+                        "on-tertiary-container": "#1d17b2",
+                        "secondary": "#ffb3ad",
+                        "surface-main": "#0A0A0B",
+                        "primary-fixed-dim": "#4edea3",
+                        "surface-variant": "#353436",
+                        "on-background": "#e5e2e3",
+                        "surface-container-low": "#1c1b1c",
+                        "tertiary-container": "#9699ff",
+                        "inverse-surface": "#e5e2e3",
+                        "secondary-fixed-dim": "#ffb3ad",
+                        "surface-container-lowest": "#0e0e0f",
+                        "surface-card": "#111112",
+                        "text-dim": "#4B5563",
+                        "surface-container-high": "#2a2a2b",
+                        "on-secondary-fixed": "#410004",
+                        "on-secondary-fixed-variant": "#930013",
+                        "on-primary-fixed-variant": "#005236",
+                        "primary-container": "#10b981",
+                        "surface-tint": "#4edea3",
+                        "on-surface": "#e5e2e3",
+                        "tertiary-fixed-dim": "#c0c1ff",
+                        "on-tertiary": "#1000a9",
+                        "error": "#ffb4ab",
+                        "on-tertiary-fixed": "#07006c",
+                        "on-secondary": "#68000a",
+                        "on-error": "#690005",
+                        "outline": "#86948a",
+                        "inverse-on-surface": "#313031",
+                        "surface-dim": "#131314",
+                        "primary-fixed": "#6ffbbe",
+                        "error-container": "#93000a",
+                        "tertiary": "#c0c1ff",
+                        "text-muted": "#9CA3AF",
+                        "on-primary-container": "#00422b",
+                        "surface-overlay": "rgba(20, 20, 22, 0.8)",
+                        "on-surface-variant": "#bbcabf",
+                        "secondary-fixed": "#ffdad7",
+                        "on-error-container": "#ffdad6",
+                        "primary": "#4edea3",
+                        "inverse-primary": "#006c49",
+                        "tertiary-fixed": "#e1e0ff",
+                        "surface-container": "#201f20",
+                        "outline-variant": "#3c4a42",
+                        "surface-bright": "#3a393a",
+                        "surface-container-highest": "#353436",
+                        "secondary-container": "#a40217"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gap-lg": "24px",
+                        "container-padding": "32px",
+                        "gap-md": "16px",
+                        "gap-sm": "8px",
+                        "gap-xs": "4px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "caption": ["Inter"],
+                        "data-mono": ["Geist Mono"],
+                        "headline-sm": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "caption": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "data-mono": ["14px", {"lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                        "headline-sm": ["18px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom scrollbar for deep professional feel */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-track { background: #0A0A0B; }
+        .dark ::-webkit-scrollbar-thumb { background: #1F2937; }
+        .dark ::-webkit-scrollbar-thumb:hover { background: #353436; }
+        
+        .glass-tooltip {
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-surface-main text-gray-900 dark:text-on-surface font-body-md text-body-md antialiased overflow-x-hidden transition-colors duration-300">
+<!-- TopAppBar (Ticker Tape) -->
+<div class="fixed top-0 left-0 w-full flex items-center px-4 h-8 z-40 bg-white dark:bg-surface-container-lowest overflow-hidden border-b border-gray-200 dark:border-border-subtle transition-colors duration-300">
+<span class="material-symbols-outlined text-caption text-emerald-600 dark:text-primary mr-2" style="font-variation-settings: 'FILL' 1;">sensors</span>
+<div class="font-data-mono text-caption text-gray-600 dark:text-tertiary whitespace-nowrap animate-[marquee_20s_linear_infinite]">
+            S&amp;P 500: 5,241.53 (+0.45%) | NASDAQ: 16,384.47 (+0.12%) | HSI: 16,725.10 (-0.32%) | Scheduler: Next run in 4h
+        </div>
+</div>
+<!-- TopNavBar -->
+<nav class="fixed top-8 left-0 w-full flex justify-between items-center px-container-padding h-16 z-50 bg-white dark:bg-surface-main border-b border-gray-200 dark:border-border-subtle transition-colors duration-300">
+<div class="flex items-center gap-gap-md">
+<span class="font-headline-md text-headline-md font-bold tracking-tight text-emerald-600 dark:text-primary">TRADING24</span>
+</div>
+<div class="hidden md:flex items-center space-x-gap-md h-full">
+<!-- Navigation Links: "Analysis" is Active for Deep Insights -->
+<a class="h-full flex items-center font-body-md text-body-md text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary transition-colors duration-200" href="#">Dashboard</a>
+<a class="h-full flex items-center font-body-md text-body-md text-emerald-600 dark:text-primary font-bold border-b-2 border-emerald-600 dark:border-primary pb-1 opacity-80" href="#">Analysis</a>
+<a class="h-full flex items-center font-body-md text-body-md text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary transition-colors duration-200" href="#">Watchlist</a>
+<a class="h-full flex items-center font-body-md text-body-md text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary transition-colors duration-200" href="#">Settings</a>
+</div>
+<div class="flex items-center space-x-gap-sm">
+<button class="p-2 text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary transition-colors duration-200" onclick="document.documentElement.classList.toggle('dark')">
+<span class="material-symbols-outlined block dark:hidden">dark_mode</span>
+<span class="material-symbols-outlined hidden dark:block">light_mode</span>
+</button>
+<button class="p-2 text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary transition-colors duration-200">
+<span class="material-symbols-outlined">search</span>
+</button>
+<button class="p-2 text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary transition-colors duration-200">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary transition-colors duration-200">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</nav>
+<!-- Main Layout Container -->
+<div class="flex pt-24 min-h-screen">
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-24 bottom-0 flex flex-col z-30 bg-white dark:bg-surface-card border-r border-gray-200 dark:border-border-subtle w-64 h-[calc(100vh-6rem)] transition-colors duration-300">
+<div class="p-4 border-b border-gray-200 dark:border-border-subtle">
+<div class="flex items-center space-x-3 mb-1">
+<span class="material-symbols-outlined text-emerald-600 dark:text-primary">memory</span>
+<h2 class="font-headline-sm text-headline-sm text-gray-900 dark:text-on-surface">Agent Pipeline</h2>
+</div>
+<p class="font-body-md text-body-md text-gray-600 dark:text-on-surface-variant">Live Execution Status</p>
+</div>
+<nav class="flex-1 py-4 flex flex-col space-y-1">
+<!-- Navigation Tabs: "Technicals" is Active -->
+<a class="flex items-center space-x-3 bg-gray-50 dark:bg-surface-container-high text-emerald-600 dark:text-primary border-l-4 border-emerald-600 dark:border-primary px-4 py-3 scale-[0.99] font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">analytics</span>
+<span>Technicals</span>
+</a>
+<a class="flex items-center space-x-3 text-gray-600 dark:text-on-surface-variant px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-variant transition-all duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">equalizer</span>
+<span>Fundamentals</span>
+</a>
+<a class="flex items-center space-x-3 text-gray-600 dark:text-on-surface-variant px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-variant transition-all duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">psychology</span>
+<span>Sentiment</span>
+</a>
+<a class="flex items-center space-x-3 text-gray-600 dark:text-on-surface-variant px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-variant transition-all duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">newspaper</span>
+<span>News</span>
+</a>
+<a class="flex items-center space-x-3 text-gray-600 dark:text-on-surface-variant px-4 py-3 hover:bg-gray-100 dark:hover:bg-surface-variant transition-all duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">security</span>
+<span>Risk</span>
+</a>
+</nav>
+<div class="p-4 border-t border-gray-200 dark:border-border-subtle">
+<button class="w-full py-2 border border-gray-300 dark:border-border-subtle text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary hover:border-emerald-600 dark:hover:border-primary transition-colors font-body-md text-body-md rounded">
+                    View Audit Log
+                </button>
+</div>
+</aside>
+<!-- Main Content Canvas (Bento Grid) -->
+<main class="ml-64 flex-1 p-container-padding">
+<!-- Ticker Header & Price Module -->
+<header class="bg-white dark:bg-surface-card border border-gray-200 dark:border-border-subtle rounded-DEFAULT p-6 mb-gap-lg flex justify-between items-center transition-colors duration-300">
+<div class="flex items-center gap-gap-md">
+<div>
+<div class="flex items-center gap-2">
+<h1 class="font-headline-md text-headline-md font-bold text-gray-900 dark:text-on-surface">NVDA</h1>
+<span class="bg-gray-100 dark:bg-surface-container-high text-gray-600 dark:text-on-surface-variant px-2 py-0.5 rounded font-data-mono text-caption">NASDAQ</span>
+</div>
+<p class="font-body-lg text-body-lg text-gray-600 dark:text-on-surface-variant mt-1">NVIDIA Corporation</p>
+</div>
+</div>
+<div class="flex flex-col items-end">
+<div class="flex items-baseline gap-3">
+<span class="font-display-lg text-display-lg font-data-mono text-emerald-600 dark:text-primary-fixed tracking-tight">875.28</span>
+<span class="font-data-mono text-body-md text-emerald-600 dark:text-primary">+14.25 (1.65%)</span>
+</div>
+<p class="font-data-mono text-caption text-gray-500 dark:text-text-muted mt-1">Mkt Open • 11:42 AM EDT</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="text-right">
+<p class="font-label-caps text-label-caps text-gray-600 dark:text-on-surface-variant mb-1 uppercase">Consensus</p>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-emerald-500 dark:bg-primary animate-pulse"></div>
+<span class="font-data-mono text-caption text-gray-900 dark:text-on-surface">Strong Buy</span>
+</div>
+</div>
+<div class="bg-emerald-50 dark:bg-primary-container px-6 py-3 rounded-DEFAULT flex items-center gap-2 border border-emerald-200 dark:border-primary-fixed-dim">
+<span class="material-symbols-outlined text-emerald-800 dark:text-on-primary-container" style="font-variation-settings: 'FILL' 1;">recommend</span>
+<span class="font-headline-sm text-headline-sm text-emerald-800 dark:text-on-primary-container font-bold">Latest Decision: BUY</span>
+</div>
+</div>
+</header>
+<!-- Main Grid Structure -->
+<div class="grid grid-cols-12 gap-gap-lg">
+<!-- Chart Module (Col 8) -->
+<div class="col-span-12 lg:col-span-8 bg-white dark:bg-surface-card border border-gray-200 dark:border-border-subtle rounded-DEFAULT flex flex-col h-[600px] overflow-hidden relative transition-colors duration-300">
+<!-- Chart Header Tools -->
+<div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-border-subtle">
+<div class="flex space-x-4">
+<button class="font-data-mono text-caption text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary">1D</button>
+<button class="font-data-mono text-caption text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary">1W</button>
+<button class="font-data-mono text-caption text-emerald-600 dark:text-primary border-b border-emerald-600 dark:border-primary pb-1">1M</button>
+<button class="font-data-mono text-caption text-gray-600 dark:text-on-surface-variant hover:text-emerald-600 dark:hover:text-primary">YTD</button>
+</div>
+<div class="flex space-x-2">
+<button class="p-1 text-gray-400 dark:text-text-muted hover:text-gray-900 dark:hover:text-on-surface border border-transparent hover:border-gray-200 dark:hover:border-border-subtle rounded"><span class="material-symbols-outlined text-[20px]">candlestick_chart</span></button>
+<button class="p-1 text-gray-400 dark:text-text-muted hover:text-gray-900 dark:hover:text-on-surface border border-transparent hover:border-gray-200 dark:hover:border-border-subtle rounded"><span class="material-symbols-outlined text-[20px]">show_chart</span></button>
+</div>
+</div>
+<!-- Chart Canvas Area (Placeholder for TradingView/ECharts) -->
+<div class="flex-1 relative bg-gray-50 dark:bg-surface-main group transition-colors duration-300">
+<!-- Grid Lines -->
+<svg class="absolute inset-0 w-full h-full text-gray-200 dark:text-[#1F2937]" xmlns="http://www.w3.org/2000/svg">
+<!-- Horizontal Lines -->
+<line stroke="currentColor" stroke-dasharray="4 4" stroke-width="1" x1="0" x2="100%" y1="20%" y2="20%"></line>
+<line stroke="currentColor" stroke-dasharray="4 4" stroke-width="1" x1="0" x2="100%" y1="40%" y2="40%"></line>
+<line stroke="currentColor" stroke-dasharray="4 4" stroke-width="1" x1="0" x2="100%" y1="60%" y2="60%"></line>
+<line stroke="currentColor" stroke-dasharray="4 4" stroke-width="1" x1="0" x2="100%" y1="80%" y2="80%"></line>
+<!-- Vertical Lines -->
+<line stroke="currentColor" stroke-dasharray="4 4" stroke-width="1" x1="25%" x2="25%" y1="0" y2="100%"></line>
+<line stroke="currentColor" stroke-dasharray="4 4" stroke-width="1" x1="50%" x2="50%" y1="0" y2="100%"></line>
+<line stroke="currentColor" stroke-dasharray="4 4" stroke-width="1" x1="75%" x2="75%" y1="0" y2="100%"></line>
+</svg>
+<!-- Simulated K-Line Data (Static representation) -->
+<div class="absolute bottom-[20%] left-[20%] w-2 bg-gray-400 dark:bg-text-muted h-[100px] opacity-40"></div>
+<div class="absolute bottom-[25%] left-[20%] w-4 -ml-1 bg-gray-600 dark:bg-on-surface-variant h-[60px]"></div>
+<div class="absolute bottom-[25%] left-[40%] w-2 bg-emerald-500 dark:bg-primary h-[140px] opacity-40"></div>
+<div class="absolute bottom-[35%] left-[40%] w-4 -ml-1 bg-emerald-500 dark:bg-primary h-[80px]"></div>
+<div class="absolute bottom-[40%] left-[60%] w-2 bg-red-500 dark:bg-error h-[120px] opacity-40"></div>
+<div class="absolute bottom-[45%] left-[60%] w-4 -ml-1 bg-red-500 dark:bg-error h-[90px]"></div>
+<div class="absolute bottom-[30%] left-[80%] w-2 bg-emerald-500 dark:bg-primary h-[200px] opacity-40"></div>
+<div class="absolute bottom-[40%] left-[80%] w-4 -ml-1 bg-emerald-500 dark:bg-primary h-[120px]"></div>
+<!-- Markers (BUY/SELL) -->
+<div class="absolute bottom-[58%] left-[40%] -ml-3 flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-emerald-100 dark:bg-primary-container border border-emerald-300 dark:border-primary-fixed-dim flex items-center justify-center shadow-[0_0_10px_rgba(16,185,129,0.3)] cursor-pointer hover:scale-110 transition-transform">
+<span class="font-label-caps text-label-caps text-emerald-800 dark:text-on-primary-container font-bold">B</span>
+</div>
+<div class="h-8 w-px bg-emerald-500 dark:bg-primary-fixed-dim opacity-50 mt-1"></div>
+</div>
+<div class="absolute bottom-[70%] left-[60%] -ml-3 flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-red-100 dark:bg-error border border-red-300 dark:border-error-container flex items-center justify-center shadow-[0_0_10px_rgba(255,180,171,0.3)] cursor-pointer hover:scale-110 transition-transform">
+<span class="font-label-caps text-label-caps text-red-800 dark:text-on-error font-bold">S</span>
+</div>
+<div class="h-8 w-px bg-red-500 dark:bg-error opacity-50 mt-1"></div>
+</div>
+<!-- Hover Precision Marker (Simulated) -->
+<div class="hidden group-hover:flex absolute top-0 bottom-0 left-[80%] w-px bg-gray-400 dark:bg-on-surface-variant z-10 pointer-events-none"></div>
+<div class="hidden group-hover:flex absolute top-[20%] left-[80%] ml-4 bg-white/90 dark:bg-surface-overlay glass-tooltip border border-gray-200 dark:border-border-subtle p-3 rounded-DEFAULT flex-col gap-1 z-20 pointer-events-none w-48 shadow-lg dark:shadow-none">
+<p class="font-data-mono text-caption text-gray-500 dark:text-text-muted">2023-10-24</p>
+<div class="flex justify-between">
+<span class="font-data-mono text-caption text-gray-900 dark:text-on-surface">Open</span>
+<span class="font-data-mono text-caption text-emerald-600 dark:text-primary">850.12</span>
+</div>
+<div class="flex justify-between">
+<span class="font-data-mono text-caption text-gray-900 dark:text-on-surface">Close</span>
+<span class="font-data-mono text-caption text-emerald-600 dark:text-primary">875.28</span>
+</div>
+<div class="mt-2 pt-2 border-t border-gray-200 dark:border-border-subtle">
+<span class="font-label-caps text-label-caps text-emerald-600 dark:text-primary uppercase">Signal: Accumulate</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Decision History Log (Col 4) -->
+<div class="col-span-12 lg:col-span-4 bg-white dark:bg-surface-card border border-gray-200 dark:border-border-subtle rounded-DEFAULT flex flex-col h-[600px] transition-colors duration-300">
+<div class="p-4 border-b border-gray-200 dark:border-border-subtle flex justify-between items-center">
+<h3 class="font-headline-sm text-headline-sm text-gray-900 dark:text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-emerald-600 dark:text-primary text-[20px]">history</span>
+                            Decision History
+                        </h3>
+<span class="font-data-mono text-caption text-gray-500 dark:text-text-muted">30 Days</span>
+</div>
+<div class="flex-1 overflow-y-auto p-4 space-y-2">
+<!-- Log Entry -->
+<div class="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-surface-main rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-subtle cursor-default">
+<div class="flex flex-col">
+<span class="font-data-mono text-caption text-gray-500 dark:text-text-muted">Today, 09:30</span>
+<span class="font-data-mono text-body-md text-gray-900 dark:text-on-surface">875.28</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="text-right flex flex-col items-end">
+<span class="font-data-mono text-caption text-emerald-600 dark:text-primary">Conf: 92%</span>
+<span class="font-label-caps text-label-caps text-gray-600 dark:text-on-surface-variant">FUND + TECH</span>
+</div>
+<span class="px-2 py-1 bg-emerald-100 dark:bg-primary-container text-emerald-800 dark:text-on-primary-container font-label-caps text-label-caps rounded w-16 text-center">BUY</span>
+</div>
+</div>
+<!-- Log Entry -->
+<div class="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-surface-main rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-subtle cursor-default">
+<div class="flex flex-col">
+<span class="font-data-mono text-caption text-gray-500 dark:text-text-muted">Oct 23, 15:45</span>
+<span class="font-data-mono text-body-md text-gray-900 dark:text-on-surface">862.10</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="text-right flex flex-col items-end">
+<span class="font-data-mono text-caption text-emerald-600 dark:text-primary">Conf: 88%</span>
+<span class="font-label-caps text-label-caps text-gray-600 dark:text-on-surface-variant">TECH ONLY</span>
+</div>
+<span class="px-2 py-1 bg-emerald-100 dark:bg-primary-container text-emerald-800 dark:text-on-primary-container font-label-caps text-label-caps rounded w-16 text-center">BUY</span>
+</div>
+</div>
+<!-- Log Entry -->
+<div class="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-surface-main rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-subtle cursor-default">
+<div class="flex flex-col">
+<span class="font-data-mono text-caption text-gray-500 dark:text-text-muted">Oct 20, 10:15</span>
+<span class="font-data-mono text-body-md text-gray-900 dark:text-on-surface">845.50</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="text-right flex flex-col items-end">
+<span class="font-data-mono text-caption text-gray-600 dark:text-on-surface-variant">Conf: 45%</span>
+<span class="font-label-caps text-label-caps text-gray-600 dark:text-on-surface-variant">SENTIMENT</span>
+</div>
+<span class="px-2 py-1 bg-gray-200 dark:bg-surface-variant text-gray-800 dark:text-on-surface font-label-caps text-label-caps rounded w-16 text-center">HOLD</span>
+</div>
+</div>
+<!-- Log Entry -->
+<div class="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-surface-main rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-subtle cursor-default">
+<div class="flex flex-col">
+<span class="font-data-mono text-caption text-gray-500 dark:text-text-muted">Oct 18, 14:00</span>
+<span class="font-data-mono text-body-md text-gray-900 dark:text-on-surface">880.20</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="text-right flex flex-col items-end">
+<span class="font-data-mono text-caption text-red-600 dark:text-error">Conf: 85%</span>
+<span class="font-label-caps text-label-caps text-gray-600 dark:text-on-surface-variant">RISK ALERT</span>
+</div>
+<span class="px-2 py-1 bg-red-100 dark:bg-error text-red-800 dark:text-on-error font-label-caps text-label-caps rounded w-16 text-center">SELL</span>
+</div>
+</div>
+<!-- Log Entry -->
+<div class="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-surface-main rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-border-subtle cursor-default opacity-70">
+<div class="flex flex-col">
+<span class="font-data-mono text-caption text-gray-500 dark:text-text-muted">Oct 15, 09:30</span>
+<span class="font-data-mono text-body-md text-gray-900 dark:text-on-surface">830.00</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="text-right flex flex-col items-end">
+<span class="font-data-mono text-caption text-emerald-600 dark:text-primary">Conf: 75%</span>
+<span class="font-label-caps text-label-caps text-gray-600 dark:text-on-surface-variant">FUND + TECH</span>
+</div>
+<span class="px-2 py-1 bg-emerald-100 dark:bg-primary-container text-emerald-800 dark:text-on-primary-container font-label-caps text-label-caps rounded w-16 text-center">BUY</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Tabs Section (Col 12) -->
+<div class="col-span-12 mt-gap-md">
+<!-- Tab Headers -->
+<div class="flex space-x-8 border-b border-gray-200 dark:border-border-subtle mb-6 px-2">
+<button class="font-headline-sm text-headline-sm text-emerald-600 dark:text-primary border-b-2 border-emerald-600 dark:border-primary pb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">description</span>
+                            Agent Reports
+                        </button>
+<button class="font-headline-sm text-headline-sm text-gray-600 dark:text-on-surface-variant hover:text-gray-900 dark:hover:text-on-surface pb-2 flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-[20px]">candlestick_chart</span>
+                            Technicals
+                        </button>
+<button class="font-headline-sm text-headline-sm text-gray-600 dark:text-on-surface-variant hover:text-gray-900 dark:hover:text-on-surface pb-2 flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-[20px]">feed</span>
+                            News Feed
+                        </button>
+</div>
+<!-- Tab Content: Agent Reports -->
+<div class="grid grid-cols-1 gap-gap-md">
+<!-- Report Card -->
+<div class="bg-white dark:bg-surface-container border border-gray-200 dark:border-border-subtle rounded-DEFAULT p-6 relative overflow-hidden group transition-colors duration-300">
+<!-- Decorative vertical line indicator -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 dark:bg-primary"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="bg-gray-50 dark:bg-surface-main p-2 rounded border border-gray-200 dark:border-border-subtle">
+<span class="material-symbols-outlined text-emerald-600 dark:text-primary">psychology</span>
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm text-gray-900 dark:text-on-surface">Daily Synthesis: Strong Accumulation Signal</h4>
+<p class="font-data-mono text-caption text-gray-500 dark:text-text-muted mt-1">Generated by Meta-Agent Alpha • 2 hrs ago</p>
+</div>
+</div>
+<span class="bg-emerald-50 dark:bg-primary/10 text-emerald-700 dark:text-primary border border-emerald-200 dark:border-primary/20 px-3 py-1 rounded font-data-mono text-caption">Conf: 92%</span>
+</div>
+<div class="font-data-mono text-body-md text-gray-700 dark:text-on-surface-variant bg-gray-50 dark:bg-surface-main p-4 rounded border border-gray-200 dark:border-border-subtle leading-relaxed">
+<span class="text-emerald-600 dark:text-primary">&gt; INITIALIZING ANALYSIS...</span><br/>
+                                &gt; <span class="text-gray-900 dark:text-on-surface">Fundamental Agent</span> reports Q3 revenue beat expectations by 14%. Data center growth remains primary driver.<br/>
+                                &gt; <span class="text-gray-900 dark:text-on-surface">Technical Agent</span> detects breakout from bullish pennant formation on 4H chart. RSI at 62, confirming momentum.<br/>
+                                &gt; <span class="text-gray-900 dark:text-on-surface">Sentiment Agent</span> scraped 4,200 articles. Institutional sentiment shifted from neutral to heavily bullish.<br/>
+<span class="text-emerald-600 dark:text-primary">&gt; CONCLUSION:</span> Synergistic alignment across all metrics. Recommending aggressive entry at current levels. Target price revised to 950.00.
+                            </div>
+</div>
+<!-- Report Card (Older) -->
+<div class="bg-white dark:bg-surface-container border border-gray-200 dark:border-border-subtle rounded-DEFAULT p-6 relative overflow-hidden opacity-80 transition-colors duration-300">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-gray-400 dark:bg-on-surface-variant"></div>
+<div class="flex justify-between items-start mb-4">
+<div class="flex items-center gap-3">
+<div class="bg-gray-50 dark:bg-surface-main p-2 rounded border border-gray-200 dark:border-border-subtle">
+<span class="material-symbols-outlined text-gray-600 dark:text-on-surface-variant">security</span>
+</div>
+<div>
+<h4 class="font-headline-sm text-headline-sm text-gray-900 dark:text-on-surface">Risk Assessment: Volatility Spike Detected</h4>
+<p class="font-data-mono text-caption text-gray-500 dark:text-text-muted mt-1">Generated by Risk-Agent Beta • Yesterday</p>
+</div>
+</div>
+<span class="bg-gray-100 dark:bg-surface-variant text-gray-700 dark:text-on-surface border border-gray-200 dark:border-border-subtle px-3 py-1 rounded font-data-mono text-caption">Conf: 85%</span>
+</div>
+<div class="font-data-mono text-body-md text-gray-700 dark:text-on-surface-variant bg-gray-50 dark:bg-surface-main p-4 rounded border border-gray-200 dark:border-border-subtle leading-relaxed">
+                                &gt; <span class="text-gray-900 dark:text-on-surface">Risk Agent</span> monitoring macro environment. Detected pre-market volatility cluster tied to CPI data release.<br/>
+                                &gt; Option chain analysis shows elevated put/call ratio expiring this Friday.<br/>
+<span class="text-gray-600 dark:text-on-surface-variant">&gt; ACTION:</span> Tightening trailing stops. Temporarily downgrading conviction score until macro data is digested.
+                            </div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

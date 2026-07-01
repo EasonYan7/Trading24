@@ -1,0 +1,30 @@
+[project]
+name = "trading24"
+version = "0.1.0"
+description = "Trading24 — 每日多智能体选股分析平台（基于 TradingAgents）"
+requires-python = ">=3.12"
+dependencies = [
+    "tradingagents",
+    "streamlit>=1.40",
+    "plotly>=5.24",
+    "pyyaml>=6.0",
+    "yfinance>=0.2.40",
+    "stockstats>=0.6.5",
+    "pandas>=2.2",
+    "streamlit-sortables>=0.3.1",
+    "httpx>=0.27",
+    "mistune>=3.0",
+    "bleach>=6.0",
+]
+
+[tool.uv.sources]
+# 本地路径依赖。迁移到 Mac mini / 云时，把 TradingAgents 放到同样位置，
+# 或改这里的 path 指向目标机上的 TradingAgents 目录。
+tradingagents = { path = "/Users/didi/TradingAgents", editable = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["trading24"]

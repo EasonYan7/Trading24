@@ -1,0 +1,16 @@
+# 密钥 —— 绝不提交
+.env
+.env.*
+!.env.example
+
+# 运行时数据 / 数据库
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 系统 / 编辑器
+.DS_Store
+*.log

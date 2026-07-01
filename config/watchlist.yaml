@@ -1,0 +1,17 @@
+run_time: 08:30
+tickers:
+- symbol: 600519.SS
+  name: 茅台
+  upper: 1300
+  lower: 1100
+  pct_move: 6
+- symbol: NVDA
+  name: 英伟达
+  upper: 1400
+  lower: 1100
+  pct_move: 8
+- symbol: 0700.HK
+  name: 腾讯
+  upper: 460
+  lower: 360
+  pct_move: 6
