@@ -2680,17 +2680,22 @@ def overview():
                     goto_analysis(sym)
                     st.rerun()
 
+    # 用真实的决策分布，而不是编造的分析师进度
+    buys = sum(1 for s in symbols if latest[s] and _norm_decision(latest[s].decision) == "BUY")
+    holds = sum(1 for s in symbols if latest[s] and _norm_decision(latest[s].decision) == "HOLD")
+    sells = sum(1 for s in symbols if latest[s] and _norm_decision(latest[s].decision) == "SELL")
     stage_rows = [
-        ("Fundamentals", "Complete" if done else "Pending", "var(--t24-primary)" if done else "var(--t24-muted)", False),
-        ("Technicals", f"Processing {symbols[0]}" if running else "Ready", "var(--t24-tertiary)" if running else "var(--t24-primary)", bool(running)),
-        ("Sentiment", "Pending" if done < len(symbols) else "Complete", "var(--t24-muted)" if done < len(symbols) else "var(--t24-primary)", False),
+        ("增持", f"{buys} 只", "var(--t24-primary)", False),
+        ("中性", f"{holds} 只", "var(--t24-muted)", False),
+        ("减持", f"{sells} 只", "var(--t24-danger)", False),
     ]
     status_html = (
         f"<div class='t24-bento'><div class='t24-bento-title'>{icon('cpu', 18)}"
-        f"<span>Daily Run Status</span>"
+        f"<span>今日运行状态</span>"
         f"<span class='t24-data' style='margin-left:auto;font-size:12px;color:var(--t24-muted);'>{done}/{len(symbols)}</span></div>"
-        f"<div class='t24-card-footer' style='margin:0 0 4px;'><span>Processing Watchlist</span>"
-        f"<span class='t24-data'>{done}/{len(symbols)} Analyzed</span></div>"
+        f"<div class='t24-card-footer' style='margin:0 0 4px;'>"
+        f"<span>{'分析进行中' if running else ('今日已完成' if done >= len(symbols) else '待运行')}</span>"
+        f"<span class='t24-data'>已分析 {done}/{len(symbols)}</span></div>"
         f"<div class='t24-progress' style='--value:{pct}%;'><span></span></div>"
     )
     for label, state, dot, is_running in stage_rows:
