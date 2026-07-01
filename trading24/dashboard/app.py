@@ -3063,6 +3063,37 @@ def manage():
                     st.rerun()
 
 
+def default_ai_run_ids() -> list[int]:
+    """默认上下文：详情页=当前标的最近成功记录；否则=每只标的最近成功记录。"""
+    detail = st.session_state.get("detail")
+    if detail:
+        r = latest.get(detail)
+        if r and r.status == "success" and r.id:
+            return [int(r.id)]
+    ids = []
+    for s in symbols:
+        r = latest.get(s)
+        if r and r.status == "success" and r.id:
+            ids.append(int(r.id))
+    return ids
+
+
+def _send_ai(prompt: str, run_ids: list[int]) -> None:
+    prompt = (prompt or "").strip()
+    if not prompt:
+        return
+    if not run_ids:
+        st.session_state.ai_messages.append({
+            "role": "assistant", "ok": False, "attachments": [],
+            "content": "还没有可用的分析记录。先在关注列表跑一次分析，我就能基于结果回答了。"})
+        return
+    labels = [full_run_label(r) for r in selected_ai_runs(run_ids)]
+    st.session_state.ai_messages.append({"role": "user", "content": prompt, "attachments": labels})
+    with st.spinner("AI 正在读取分析记录…"):
+        ok, answer = ask_ai(prompt, build_ai_context(run_ids))
+    st.session_state.ai_messages.append({"role": "assistant", "content": answer, "ok": ok, "attachments": labels})
+
+
 def render_ai_plugin():
     with st.container(key="t24_ai_launcher"):
         launcher_label = "关闭" if st.session_state.ai_panel_open else "AI"
@@ -3073,6 +3104,17 @@ def render_ai_plugin():
 
     if not st.session_state.ai_panel_open:
         return
+
+    detail = st.session_state.get("detail")
+    default_ids = default_ai_run_ids()
+    override = [int(x) for x in st.session_state.ai_selected_run_ids if str(x).isdigit()]
+    effective_ids = override or default_ids
+    if override:
+        scope_desc = f"手动选定的 {len(override)} 条记录"
+    elif detail:
+        scope_desc = f"当前标的 · {names.get(detail, detail)}"
+    else:
+        scope_desc = f"全部关注列表 · {len(default_ids)} 只"
 
     with st.container(key="t24_ai_panel"):
         head = st.columns([4, 1], vertical_alignment="center")
@@ -3085,101 +3127,65 @@ def render_ai_plugin():
             st.session_state.ai_panel_open = False
             st.rerun()
         st.markdown(
-            "<div class='t24-muted'>选择历史记录作为长文本附件，再输入问题。"
-            "助手会读取你指定的数据。</div>",
+            f"<div class='t24-muted' style='margin:-2px 0 4px;'>分析范围：{html_safe(scope_desc)}"
+            f" · 直接提问即可，我已读取对应分析记录。</div>",
             unsafe_allow_html=True,
         )
 
-        available_runs = [r for r in db.get_runs(conn, limit=200) if r.status == "success"]
-        available_ids = [int(r.id) for r in available_runs if r.id is not None]
-        available_by_id = {int(r.id): r for r in available_runs if r.id is not None}
-        selected_default = [int(rid) for rid in st.session_state.ai_selected_run_ids if int(rid) in available_ids]
-        seed = tuple(selected_default)
-        if st.session_state.get("ai_picker_seed") != seed:
-            st.session_state.ai_run_picker = selected_default
-            st.session_state.ai_picker_seed = seed
-
-        chosen_ids = st.multiselect(
-            "长文本附件",
-            available_ids,
-            key="ai_run_picker",
-            format_func=lambda rid: full_run_label(available_by_id[rid]) if rid in available_by_id else f"#{rid}",
-            help="可选择多天或多只标的的成功分析记录。",
-        )
-        st.session_state.ai_selected_run_ids = [int(rid) for rid in chosen_ids]
-        context_text = build_ai_context(st.session_state.ai_selected_run_ids)
-
-        meta_cols = st.columns(3)
-        for slot, label, value in (
-            (meta_cols[0], "附件数", len(st.session_state.ai_selected_run_ids)),
-            (meta_cols[1], "字符数", len(context_text)),
-            (meta_cols[2], "对话数", len(st.session_state.ai_messages) // 2),
-        ):
-            slot.markdown(
-                f"<div class='t24-ai-stat'>"
-                f"<div class='t24-ai-stat-label'>{label}</div>"
-                f"<div class='t24-ai-stat-value'>{value}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-        user_prompt = st.text_area(
-            "Prompt",
-            key="ai_prompt",
-            height=90,
-            placeholder="例如：对比这两天的结论，哪些风险发生了变化？我今天应该关注什么？",
-        )
-        action_cols = st.columns([1.2, 1, 1])
-        if action_cols[0].button("发送给 AI", key="ai_send", type="primary", width="stretch"):
-            if not st.session_state.ai_selected_run_ids:
-                st.warning("请先选择至少一条历史记录作为附件。")
-            elif not user_prompt.strip():
-                st.warning("请先输入要问 AI 的问题。")
-            else:
-                labels = [full_run_label(run) for run in selected_ai_runs(st.session_state.ai_selected_run_ids)]
-                st.session_state.ai_messages.append({
-                    "role": "user",
-                    "content": user_prompt.strip(),
-                    "attachments": labels,
-                })
-                with st.spinner("AI 正在读取附件记录..."):
-                    ok, answer = ask_ai(user_prompt.strip(), context_text)
-                st.session_state.ai_messages.append({
-                    "role": "assistant",
-                    "content": answer,
-                    "ok": ok,
-                    "attachments": labels,
-                })
-                st.rerun()
-        if action_cols[1].button("清空附件", key="ai_clear_context", width="stretch"):
-            st.session_state.ai_selected_run_ids = []
-            st.session_state.ai_picker_seed = None
-            st.rerun()
-        if action_cols[2].button("清空对话", key="ai_clear_messages", width="stretch"):
-            st.session_state.ai_messages = []
-            st.rerun()
-
-        with st.expander("查看附件长文本", expanded=False):
-            st.text_area("附件内容", context_text or "未选择历史记录。", height=180, disabled=True)
-
-        with st.expander("对话历史", expanded=True):
-            if not st.session_state.ai_messages:
-                st.markdown("<div class='t24-muted'>暂无对话历史。</div>", unsafe_allow_html=True)
-            for msg in st.session_state.ai_messages[-10:]:
+        # 对话主体
+        if st.session_state.ai_messages:
+            for msg in st.session_state.ai_messages[-12:]:
                 role_label = "你" if msg["role"] == "user" else "AI"
                 css_role = "user" if msg["role"] == "user" else "assistant"
-                attachments = msg.get("attachments") or []
-                attach_text = " / ".join(attachments[:3])
-                if len(attachments) > 3:
-                    attach_text += f" / +{len(attachments) - 3}"
+                body = (html_safe(msg["content"]).replace(chr(10), "<br>") if msg["role"] == "user"
+                        else report_text_html(msg["content"]))
                 st.markdown(
                     f"<div class='t24-ai-msg {css_role}'>"
-                    f"<div class='t24-ai-meta'>{role_label}"
-                    f"{' · ' + html_safe(attach_text) if attach_text else ''}</div>"
-                    f"<div>{html_safe(msg['content']).replace(chr(10), '<br>')}</div>"
-                    f"</div>",
+                    f"<div class='t24-ai-meta'>{role_label}</div>"
+                    f"<div>{body}</div></div>",
                     unsafe_allow_html=True,
                 )
+        else:
+            if detail:
+                nm = names.get(detail, detail)
+                sugg = [f"{nm} 现在的核心风险是什么？", f"{nm} 的多空分歧在哪？", "给我一句话操作建议"]
+            else:
+                sugg = ["今天最该关注哪只？为什么？", "这些标的里谁的风险最高？", "把各只的决策和理由汇总成一段"]
+            st.markdown("<div class='t24-muted' style='margin:6px 0 4px;'>试试问我：</div>",
+                        unsafe_allow_html=True)
+            for i, q in enumerate(sugg):
+                if st.button(q, key=f"ai_sugg_{i}", width="stretch"):
+                    _send_ai(q, effective_ids)
+                    st.rerun()
+
+        # 输入（表单：提交后自动清空）
+        with st.form("ai_form", clear_on_submit=True):
+            user_prompt = st.text_area(
+                "提问", height=80, label_visibility="collapsed",
+                placeholder="问我关于这些分析的任何问题…")
+            if st.form_submit_button("发送", type="primary", width="stretch"):
+                _send_ai(user_prompt, effective_ids)
+                st.rerun()
+
+        tail = st.columns(2)
+        if tail[0].button("清空对话", key="ai_clear_messages", width="stretch"):
+            st.session_state.ai_messages = []
+            st.rerun()
+        if tail[1].button("选择记录", key="ai_scope_toggle", width="stretch"):
+            st.session_state.ai_show_advanced = not st.session_state.get("ai_show_advanced", False)
+            st.rerun()
+
+        # 高级：手动指定上下文（默认隐藏；留空=自动）
+        if st.session_state.get("ai_show_advanced", False):
+            available_runs = [r for r in db.get_runs(conn, limit=200) if r.status == "success"]
+            available_ids = [int(r.id) for r in available_runs if r.id is not None]
+            available_by_id = {int(r.id): r for r in available_runs if r.id is not None}
+            chosen_ids = st.multiselect(
+                "手动选择分析记录（留空=按上面的范围自动）",
+                available_ids, default=override, key="ai_run_picker",
+                format_func=lambda rid: full_run_label(available_by_id[rid]) if rid in available_by_id else f"#{rid}",
+            )
+            st.session_state.ai_selected_run_ids = [int(rid) for rid in chosen_ids]
 
 
 # ---- 路由 ----
