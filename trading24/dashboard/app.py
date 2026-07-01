@@ -1522,55 +1522,92 @@ button[data-testid^="stBaseButton"]:focus-visible {
   color:var(--t24-text);
 }
 .t24-theme-switch { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 10px; }
-.t24-ai-msg { border:1px solid var(--t24-border); border-radius:8px; padding:10px 12px; margin:8px 0; background:var(--t24-surface); }
+.t24-ai-msg { border:1px solid var(--t24-border); border-radius:10px; padding:8px 11px; margin:6px 0; background:var(--t24-surface); font-size:13px; line-height:1.55; }
 .t24-ai-msg.user { background:var(--t24-ai-user); border-color:var(--t24-border-strong); }
 .t24-ai-msg.assistant { background:var(--t24-ai-assistant); border-color:var(--t24-border); }
-.t24-ai-meta { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:10px; color:var(--t24-muted); margin-bottom:4px; }
+.t24-ai-msg :is(p,li) { font-size:13px !important; line-height:1.55 !important; margin:.25em 0 !important; }
+.t24-ai-msg :is(h1,h2,h3,h4) { font-size:13.5px !important; font-weight:700 !important; margin:.45em 0 .2em !important; }
+.t24-ai-msg table { font-size:12px !important; }
+.t24-ai-meta { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:9px; color:var(--t24-muted); margin-bottom:3px; }
+.t24-ai-title { font-size:15px; font-weight:700; color:var(--t24-text); line-height:1; }
+.t24-ai-scope { font-size:11px; margin:4px 0 6px; }
 .t24-ai-stat { border:1px solid var(--t24-border); border-radius:8px; padding:10px 12px; background:var(--t24-surface); min-height:58px; }
 .t24-ai-stat-label { font-size:11px; color:var(--t24-muted); margin-bottom:5px; }
 .t24-ai-stat-value { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:18px; font-weight:700; line-height:1.15; white-space:nowrap; color:var(--t24-text); }
         .st-key-t24_ai_launcher {
             position: fixed;
-            right: 22px;
-            bottom: 22px;
+            right: 20px;
+            bottom: 20px;
             z-index: 1002;
-            width: 58px;
+            width: 52px;
         }
         .st-key-t24_ai_launcher button {
-            border-color:var(--t24-primary) !important;
-            box-shadow: var(--t24-shadow);
-            min-height: 56px;
-            width: 56px;
-            border-radius:8px !important;
+            background:transparent !important;
+            border:none !important;
+            box-shadow:none !important;
+            min-height: 52px;
+            width: 52px;
             padding:0 !important;
+            color:var(--t24-primary) !important;
             font-size:0 !important;
             display:flex !important;
             align-items:center !important;
             justify-content:center !important;
         }
+        .st-key-t24_ai_launcher button:hover,
+        .st-key-t24_ai_launcher button:active,
+        .st-key-t24_ai_launcher button:focus,
+        .st-key-t24_ai_launcher button:focus-visible {
+            background:transparent !important; border:none !important;
+            box-shadow:none !important; transform:none !important; outline:none !important;
+        }
+        .st-key-t24_ai_launcher button:hover { opacity:.72; }
         .st-key-t24_ai_launcher button::before {
-            content:""; display:block; width:24px; height:24px; background:currentColor;
-            -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
-            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+            content:""; display:block; width:30px; height:30px; background:currentColor;
+            -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 30px 30px no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 30px 30px no-repeat;
         }
         .st-key-t24_ai_launcher button * {
             font-size:0 !important; line-height:0 !important; color:transparent !important;
         }
         .st-key-t24_ai_panel {
             position: fixed;
-            right: 22px;
-            bottom: 82px;
-            width: 392px;
-            max-height: calc(100vh - 118px);
+            right: 20px;
+            bottom: 20px;
+            width: 356px;
+            height: 492px;
             overflow: auto;
-            z-index: 1001;
+            z-index: 1002;
             background:var(--t24-surface);
             border:1px solid var(--t24-border-strong);
-            border-radius:12px;
-            padding:14px;
+            border-top: none;
+            border-radius:0 0 14px 14px;
+            padding:10px 12px 12px;
             box-shadow: var(--t24-shadow);
         }
-        .st-key-t24_ai_panel [data-testid="stVerticalBlock"] { gap: .45rem; }
+        .st-key-t24_ai_panel [data-testid="stVerticalBlock"] { gap: .4rem; }
+        /* sticky 头部：滚动时始终可见 */
+        /* 固定头部（独立于滚动面板，永远可见） */
+        .st-key-t24_ai_header {
+            position: fixed; right: 20px; bottom: 512px; width: 356px; z-index: 1003;
+            background: var(--t24-surface);
+            border: 1px solid var(--t24-border-strong); border-bottom: 1px solid var(--t24-border);
+            border-radius: 14px 14px 0 0; padding: 8px 12px 6px;
+            box-shadow: var(--t24-shadow);
+        }
+        /* 圆形 × 关闭按钮（头部左侧） */
+        .st-key-ai_close button {
+            border-radius: 50% !important;
+            width: 30px !important; min-width: 30px !important;
+            height: 30px !important; min-height: 30px !important;
+            padding: 0 !important; font-size: 14px !important;
+            display: flex !important; align-items: center !important; justify-content: center !important;
+        }
+        .st-key-ai_new_chat button { font-size: 12px !important; padding: 5px 8px !important; min-height: 30px !important; }
+        .st-key-ai_scope_toggle button { font-size: 12px !important; }
+        .st-key-t24_ai_panel textarea { font-size: 13px !important; }
+        .st-key-t24_ai_panel [data-testid="stForm"] button { font-size: 13px !important; }
+        [class*="st-key-ai_sugg_"] button { font-size: 12.5px !important; white-space: normal !important; text-align: left !important; padding: 7px 10px !important; }
         @media (max-width: 760px) {
             [data-testid="stSidebar"],
             [data-testid="stSidebar"] > div:first-child {
@@ -1579,13 +1616,14 @@ button[data-testid^="stBaseButton"]:focus-visible {
                 max-width: none !important;
             }
             .t24-page-title { font-size: 26px; }
-            .st-key-t24_ai_launcher { right: 12px; bottom: 14px; width: 120px; }
+            .st-key-t24_ai_launcher { right: 12px; bottom: 14px; width: 52px; }
+            .st-key-t24_ai_header {
+                left: 12px; right: 12px; width: auto; bottom: auto; top: 12px;
+                border-radius: 14px 14px 0 0;
+            }
             .st-key-t24_ai_panel {
-                left: 12px;
-                right: 12px;
-                bottom: 72px;
-                width: auto;
-                max-height: 72vh;
+                left: 12px; right: 12px; width: auto;
+                top: 64px; bottom: 12px; height: auto;
             }
         }
 hr { border-color:var(--t24-border); }
@@ -2294,7 +2332,7 @@ def render_top_nav() -> None:
     active = route_key()
     with st.container(key="t24_topnav"):
         nav_cols = st.columns(
-            [1.45, .58, .58, .58, 1.52, .58, .46, .46],
+            [1.3, .5, .5, .5, 1.95, 1.3, .5, .5],
             gap="small",
             vertical_alignment="center",
         )
@@ -2309,7 +2347,8 @@ def render_top_nav() -> None:
                           type="primary" if active == key else "secondary"):
                 handler()
                 st.rerun()
-        search = nav_cols[4].selectbox(
+        nav_cols[4].markdown("")  # 弹性留白，把搜索栏推到右侧
+        search = nav_cols[5].selectbox(
             "Search ticker",
             symbols,
             index=None,
@@ -2327,7 +2366,7 @@ def render_top_nav() -> None:
                 goto_analysis(matched)
                 st.rerun()
             candidate = normalize_new_ticker(str(search))
-            if nav_cols[5].button("添加", key="search_add_ticker", width="stretch"):
+            if nav_cols[6].button("添加", key="search_add_ticker", width="stretch"):
                 if not is_ticker_like(candidate):
                     st.toast("请输入股票代码，例如 AAPL / 600519.SS / 0700.HK")
                     st.rerun()
@@ -2350,16 +2389,12 @@ def render_top_nav() -> None:
                 st.toast(f"已添加 {candidate}，正在运行分析")
                 st.rerun()
         else:
-            nav_cols[5].markdown("")
+            nav_cols[6].markdown("")
         next_theme = "深色" if st.session_state.theme_mode == "浅色" else "浅色"
         theme_key = "theme_toggle_dark" if next_theme == "深色" else "theme_toggle_light"
-        if nav_cols[6].button("切换主题", key=theme_key, width="stretch", help="切换深浅主题"):
+        if nav_cols[7].button("切换主题", key=theme_key, width="stretch", help="切换深浅主题"):
             st.session_state.theme_mode = next_theme
             st.rerun()
-        nav_cols[7].markdown(
-            f"<div class='t24-icon-button' title='Notifications'>{icon('bell', 19)}</div>",
-            unsafe_allow_html=True,
-        )
 
 
 def render_pipeline_scrollspy() -> None:
@@ -3111,7 +3146,7 @@ def render_ai_plugin():
     with st.container(key="t24_ai_launcher"):
         launcher_type = "secondary" if st.session_state.ai_panel_open else "primary"
         if st.button("AI 助手", key="toggle_ai_panel", type=launcher_type,
-                     width="stretch", help="AI 助手"):
+                     width="stretch"):
             st.session_state.ai_panel_open = not st.session_state.ai_panel_open
             st.rerun()
 
@@ -3129,19 +3164,19 @@ def render_ai_plugin():
     else:
         scope_desc = f"全部关注列表 · {len(default_ids)} 只"
 
-    with st.container(key="t24_ai_panel"):
-        head = st.columns([4, 1], vertical_alignment="center")
-        head[0].markdown(
-            f"<div class='t24-icon-label' style='font-size:18px;font-weight:800;color:var(--t24-text);'>"
-            f"{icon('ai', 20)}<span>AI 助手</span></div>",
-            unsafe_allow_html=True,
-        )
-        if head[1].button("关闭", key="ai_close", width="stretch"):
+    with st.container(key="t24_ai_header"):
+        hc = st.columns([1, 3.2, 1.9], vertical_alignment="center")
+        if hc[0].button("✕", key="ai_close", help="关闭"):
             st.session_state.ai_panel_open = False
             st.rerun()
+        hc[1].markdown("<div class='t24-ai-title'>AI 助手</div>", unsafe_allow_html=True)
+        if hc[2].button("＋ 新对话", key="ai_new_chat", width="stretch"):
+            st.session_state.ai_messages = []
+            st.rerun()
+
+    with st.container(key="t24_ai_panel"):
         st.markdown(
-            f"<div class='t24-muted' style='margin:-2px 0 4px;'>分析范围：{html_safe(scope_desc)}"
-            f" · 直接提问即可，我已读取对应分析记录。</div>",
+            f"<div class='t24-muted t24-ai-scope'>分析范围：{html_safe(scope_desc)}</div>",
             unsafe_allow_html=True,
         )
 
@@ -3180,11 +3215,7 @@ def render_ai_plugin():
                 _send_ai(user_prompt, effective_ids)
                 st.rerun()
 
-        tail = st.columns(2)
-        if tail[0].button("清空对话", key="ai_clear_messages", width="stretch"):
-            st.session_state.ai_messages = []
-            st.rerun()
-        if tail[1].button("选择记录", key="ai_scope_toggle", width="stretch"):
+        if st.button("选择记录", key="ai_scope_toggle", width="stretch"):
             st.session_state.ai_show_advanced = not st.session_state.get("ai_show_advanced", False)
             st.rerun()
 
