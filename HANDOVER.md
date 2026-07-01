@@ -34,6 +34,20 @@ uv run streamlit run trading24/dashboard/app.py
 
 ---
 
+## 2.5 版本控制 / GitHub
+
+- 远端：**https://github.com/EasonYan7/Trading24**（private），默认分支 `main`，已配 `origin`。
+- 鉴权：gh CLI 已登录（EasonYan7），git 用 HTTPS + gh 凭证助手。提交后直接 `git push` 即可。
+- `.env`（DeepSeek/FRED 密钥）与 `data/`（数据库）已被 `.gitignore`，**永远不要提交**；只有 `.env.example` 在库里。
+- 迁移到新机器时：`git clone` 后需自建 `.env`（照 `.env.example` 填 key）并 `uv sync`。
+
+```bash
+git add -A && git commit -m "说明"    # 结尾带 Co-Authored-By 行（见项目约定）
+git push
+```
+
+---
+
 ## 3. 目录与文件职责
 
 ```
