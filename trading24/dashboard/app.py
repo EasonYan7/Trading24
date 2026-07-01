@@ -1543,6 +1543,18 @@ button[data-testid^="stBaseButton"]:focus-visible {
             width: 56px;
             border-radius:8px !important;
             padding:0 !important;
+            font-size:0 !important;
+            display:flex !important;
+            align-items:center !important;
+            justify-content:center !important;
+        }
+        .st-key-t24_ai_launcher button::before {
+            content:""; display:block; width:24px; height:24px; background:currentColor;
+            -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 24px 24px no-repeat;
+        }
+        .st-key-t24_ai_launcher button * {
+            font-size:0 !important; line-height:0 !important; color:transparent !important;
         }
         .st-key-t24_ai_panel {
             position: fixed;
@@ -1952,31 +1964,34 @@ def build_ai_context(run_ids: list[int]) -> str:
     return "\n\n---\n\n".join(report_context_for_run(run) for run in runs)
 
 
-def ask_ai(prompt: str, context_text: str) -> tuple[bool, str]:
+def ask_ai(prompt: str, context_text: str, history: list | None = None) -> tuple[bool, str]:
     settings = load_settings()
     api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
         return False, (
-            "还没有配置模型密钥。已把所选记录整理成长文本附件，"
-            "配置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY 后可直接发送给 AI。"
+            "还没有配置模型密钥。配置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY 后即可对话。"
         )
     base_url = (settings.backend_url or "https://api.deepseek.com/v1").rstrip("/")
     url = base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
+    # 系统消息只带一次分析记录，随后附上多轮对话历史 → 支持连续追问
+    messages = [{
+        "role": "system",
+        "content": (
+            "你是 Trading24 的投资分析助手。基于下面提供的历史分析记录和与用户的对话回答；"
+            "如果记录不足以支持结论，要明确说明缺口。回答使用中文，先给结论，再给依据和风险。"
+            f"\n\n可参考的分析记录：\n{context_text}"
+        ),
+    }]
+    for m in (history or []):
+        role = m.get("role")
+        if role == "user":
+            messages.append({"role": "user", "content": m.get("content", "")})
+        elif role == "assistant" and m.get("ok", True):
+            messages.append({"role": "assistant", "content": m.get("content", "")})
+    messages.append({"role": "user", "content": prompt})
     payload = {
         "model": settings.quick_think_llm or settings.deep_think_llm,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "你是 Trading24 的投资分析助手。只能基于用户提供的历史分析记录和用户问题回答；"
-                    "如果记录不足以支持结论，要明确说明缺口。回答使用中文，先给结论，再给依据和风险。"
-                ),
-            },
-            {
-                "role": "user",
-                "content": f"用户问题：\n{prompt}\n\n历史分析记录附件：\n{context_text}",
-            },
-        ],
+        "messages": messages,
         "temperature": 0.2,
     }
     try:
@@ -2279,7 +2294,7 @@ def render_top_nav() -> None:
     active = route_key()
     with st.container(key="t24_topnav"):
         nav_cols = st.columns(
-            [1.45, .58, .58, .58, 1.52, .58, .46, .46, .46],
+            [1.45, .58, .58, .58, 1.52, .58, .46, .46],
             gap="small",
             vertical_alignment="center",
         )
@@ -2341,10 +2356,7 @@ def render_top_nav() -> None:
         if nav_cols[6].button("切换主题", key=theme_key, width="stretch", help="切换深浅主题"):
             st.session_state.theme_mode = next_theme
             st.rerun()
-        if nav_cols[7].button("AI 助手", key="open_ai_from_nav", width="stretch", help="打开 AI 助手"):
-            st.session_state.ai_panel_open = True
-            st.rerun()
-        nav_cols[8].markdown(
+        nav_cols[7].markdown(
             f"<div class='t24-icon-button' title='Notifications'>{icon('bell', 19)}</div>",
             unsafe_allow_html=True,
         )
@@ -3088,17 +3100,18 @@ def _send_ai(prompt: str, run_ids: list[int]) -> None:
             "content": "还没有可用的分析记录。先在关注列表跑一次分析，我就能基于结果回答了。"})
         return
     labels = [full_run_label(r) for r in selected_ai_runs(run_ids)]
+    history = list(st.session_state.ai_messages)  # 本轮提问之前的对话历史
     st.session_state.ai_messages.append({"role": "user", "content": prompt, "attachments": labels})
-    with st.spinner("AI 正在读取分析记录…"):
-        ok, answer = ask_ai(prompt, build_ai_context(run_ids))
+    with st.spinner("AI 正在思考…"):
+        ok, answer = ask_ai(prompt, build_ai_context(run_ids), history)
     st.session_state.ai_messages.append({"role": "assistant", "content": answer, "ok": ok, "attachments": labels})
 
 
 def render_ai_plugin():
     with st.container(key="t24_ai_launcher"):
-        launcher_label = "关闭" if st.session_state.ai_panel_open else "AI"
         launcher_type = "secondary" if st.session_state.ai_panel_open else "primary"
-        if st.button(launcher_label, key="toggle_ai_panel", type=launcher_type, width="stretch"):
+        if st.button("AI 助手", key="toggle_ai_panel", type=launcher_type,
+                     width="stretch", help="AI 助手"):
             st.session_state.ai_panel_open = not st.session_state.ai_panel_open
             st.rerun()
 
