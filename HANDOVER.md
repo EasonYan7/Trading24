@@ -117,6 +117,16 @@ _typeui/DESIGN.md      Agentic 设计系统原始 token（typeui pull 拉的）
 
 11. **设计系统 = Agentic**（`npx typeui.sh pull agentic`）：暖白 `#F6F6F1` + 白卡 + 橙 `#FF5701`；Playfair Display 衬线标题/正文 + JetBrains Mono 标签/数字。决策色：增持 `#16A34A` / 中性 `#9A958A` / 减持 `#DC2626`。**用户明确要求"高级 ≠ 暗色"，且选择留在 Streamlit（不另起自定义前端）**。
 
+12. **Streamlit 样式反复踩的坑**（改前端前必看）：
+    - button 做纯图标：隐藏文字用 `button * { display:none }`，**不要用 `font-size:0`**（label div 仍占宽，把 `::before` 图标挤离中心）。图标用 `::before` + CSS mask。
+    - 图标/浮动按钮 hover 跳动：显式 `:hover,:active,:focus { transform:none; border:none; box-shadow:none }`。
+    - **`help=` 会泄漏浮层**：图标按钮别加 help，hover 时会浮出脱节的提示文字。
+    - 列间垂直不齐：同一 `st.columns(vertical_alignment="center")` 里 markdown 比 button 默认低约 8px，用 `getBoundingClientRect` 比中心 y，必要时 `transform:translateY(-8px)` 校正。
+    - `position:sticky` 在面板里不生效（flex 嵌套所致）；要头部常驻用独立 `position:fixed` 容器。
+    - markdown 里的 `$` 会被当 LaTeX：markdown 语境 `md()` 转义，HTML 语境 `html_safe()`。
+
+13. **🔴 改完 UI 必须实测再说"完成"**：用户明确要求。任何 CSS/布局改动，先用 Claude-in-Chrome 渲染 + DOM 实测（`getBoundingClientRect` 比对齐、`getComputedStyle` 查 border/bg），确认后才说"修好了"，**不要目测一张缩放图就宣称完成**。
+
 ---
 
 ## 6. 已完成 vs 待办（详见 todo.md）
