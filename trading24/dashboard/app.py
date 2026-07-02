@@ -1601,15 +1601,26 @@ button[data-testid^="stBaseButton"]:focus-visible {
             width: 30px !important; min-width: 30px !important;
             height: 30px !important; min-height: 30px !important;
             padding: 0 !important; font-size: 14px !important;
+            border: none !important; box-shadow: none !important;
+            background: color-mix(in srgb, currentColor 9%, transparent) !important;
+            color: var(--t24-text) !important;
             display: flex !important; align-items: center !important; justify-content: center !important;
+        }
+        .st-key-ai_close button:hover {
+            background: color-mix(in srgb, currentColor 18%, transparent) !important;
+            border: none !important; box-shadow: none !important;
         }
         /* 头部图标按钮：新对话(加号) + 选择记录(列表) */
         .st-key-ai_new_chat button, .st-key-ai_scope_toggle button {
-            width:32px !important; min-width:32px !important; height:30px !important; min-height:30px !important;
+            width:30px !important; min-width:30px !important; height:30px !important; min-height:30px !important;
             padding:0 !important; font-size:0 !important;
-            border:1px solid var(--t24-border) !important; border-radius:8px !important;
-            color:var(--t24-text) !important;
+            border:none !important; background:transparent !important; box-shadow:none !important;
+            border-radius:8px !important; color:var(--t24-text-muted, var(--t24-text)) !important;
             display:flex !important; align-items:center !important; justify-content:center !important;
+        }
+        .st-key-ai_new_chat button:hover, .st-key-ai_scope_toggle button:hover {
+            background:color-mix(in srgb, currentColor 12%, transparent) !important;
+            border:none !important; box-shadow:none !important;
         }
         .st-key-ai_new_chat button *, .st-key-ai_scope_toggle button * {
             font-size:0 !important; line-height:0 !important; color:transparent !important;
@@ -3192,8 +3203,7 @@ def render_ai_plugin():
             st.session_state.ai_panel_open = False
             st.rerun()
         hc[1].markdown("<div class='t24-ai-title'>AI 助手</div>", unsafe_allow_html=True)
-        if hc[2].button("选择记录", key="ai_scope_toggle", width="stretch", help="选择分析记录",
-                        type="primary" if st.session_state.get("ai_show_advanced") else "secondary"):
+        if hc[2].button("选择记录", key="ai_scope_toggle", width="stretch", help="选择分析记录"):
             st.session_state.ai_show_advanced = not st.session_state.get("ai_show_advanced", False)
             st.rerun()
         if hc[3].button("新对话", key="ai_new_chat", width="stretch", help="开始新对话"):
