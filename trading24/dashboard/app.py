@@ -1640,7 +1640,11 @@ button[data-testid^="stBaseButton"]:focus-visible {
         }
         .st-key-t24_ai_panel textarea { font-size: 13px !important; }
         .st-key-t24_ai_panel [data-testid="stForm"] button { font-size: 13px !important; }
-        [class*="st-key-ai_sugg_"] button { font-size: 12.5px !important; white-space: normal !important; text-align: left !important; padding: 7px 10px !important; }
+        [class*="st-key-ai_sugg_"] button {
+            font-size: 12.5px !important; white-space: normal !important; text-align: left !important;
+            padding: 6px 11px !important; min-height: 0 !important; line-height: 1.35 !important;
+            border-radius: 8px !important; color: var(--t24-text-muted, var(--t24-text)) !important;
+        }
         @media (max-width: 760px) {
             [data-testid="stSidebar"],
             [data-testid="stSidebar"] > div:first-child {
@@ -3199,14 +3203,14 @@ def render_ai_plugin():
 
     with st.container(key="t24_ai_header"):
         hc = st.columns([0.9, 2.7, 0.8, 0.8], vertical_alignment="center")
-        if hc[0].button("✕", key="ai_close", help="关闭"):
+        if hc[0].button("✕", key="ai_close"):
             st.session_state.ai_panel_open = False
             st.rerun()
         hc[1].markdown("<div class='t24-ai-title'>AI 助手</div>", unsafe_allow_html=True)
-        if hc[2].button("选择记录", key="ai_scope_toggle", width="stretch", help="选择分析记录"):
+        if hc[2].button("选择记录", key="ai_scope_toggle", width="stretch"):
             st.session_state.ai_show_advanced = not st.session_state.get("ai_show_advanced", False)
             st.rerun()
-        if hc[3].button("新对话", key="ai_new_chat", width="stretch", help="开始新对话"):
+        if hc[3].button("新对话", key="ai_new_chat", width="stretch"):
             st.session_state.ai_messages = []
             st.rerun()
 
