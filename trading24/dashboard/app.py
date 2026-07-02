@@ -1529,7 +1529,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
 .t24-ai-msg :is(h1,h2,h3,h4) { font-size:13.5px !important; font-weight:700 !important; margin:.45em 0 .2em !important; }
 .t24-ai-msg table { font-size:12px !important; }
 .t24-ai-meta { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:9px; color:var(--t24-muted); margin-bottom:3px; }
-.t24-ai-title { font-size:15px; font-weight:700; color:var(--t24-text); line-height:1; }
+.t24-ai-title { font-size:15px; font-weight:700; color:var(--t24-text); height:30px; display:flex; align-items:center; margin:0; transform:translateY(-8px); }
 .t24-ai-scope { font-size:11px; margin:4px 0 6px; }
 .t24-ai-stat { border:1px solid var(--t24-border); border-radius:8px; padding:10px 12px; background:var(--t24-surface); min-height:58px; }
 .t24-ai-stat-label { font-size:11px; color:var(--t24-muted); margin-bottom:5px; }
@@ -1622,9 +1622,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
             background:color-mix(in srgb, currentColor 12%, transparent) !important;
             border:none !important; box-shadow:none !important;
         }
-        .st-key-ai_new_chat button *, .st-key-ai_scope_toggle button * {
-            font-size:0 !important; line-height:0 !important; color:transparent !important;
-        }
+        .st-key-ai_new_chat button *, .st-key-ai_scope_toggle button * { display:none !important; }
         .st-key-ai_new_chat button::before, .st-key-ai_scope_toggle button::before {
             content:""; display:block; width:17px; height:17px; background:currentColor;
             -webkit-mask-repeat:no-repeat; -webkit-mask-position:center; -webkit-mask-size:17px;
