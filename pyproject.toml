@@ -19,8 +19,8 @@ dependencies = [
 
 [tool.uv.sources]
 # 本地路径依赖。迁移到 Mac mini / 云时，把 TradingAgents 放到同样位置，
-# 或改这里的 path 指向目标机上的 TradingAgents 目录。
-tradingagents = { path = "/Users/didi/TradingAgents", editable = true }
+# 或改这里的 path 指向目标机上的 tradingagents 目录。
+tradingagents = { path = "/Users/sen/projects/tradingagents", editable = true }
 
 [build-system]
 requires = ["hatchling"]

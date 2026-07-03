@@ -30,7 +30,7 @@ uv run python scripts/run_batch.py 2026-06-26
 uv run streamlit run trading24/dashboard/app.py
 ```
 
-环境：Python 3.12+，uv 管理。依赖见 `pyproject.toml`，其中 `tradingagents` 是**本地路径依赖**（`/Users/didi/TradingAgents`，editable）——迁移时改 `[tool.uv.sources]` 里的 path。
+环境：Python 3.12+，uv 管理。依赖见 `pyproject.toml`，其中 `tradingagents` 是**本地路径依赖**（`/Users/sen/projects/tradingagents`，editable）——迁移时改 `[tool.uv.sources]` 里的 path。
 
 ---
 
