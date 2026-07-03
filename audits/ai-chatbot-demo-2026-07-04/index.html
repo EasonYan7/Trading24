@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Trading24 AI Chatbot Demo</title>
+  <title>Trading24 AI Popup Chat Demo</title>
   <style>
     :root {
       color-scheme: dark;
@@ -21,7 +21,7 @@
       --danger: #ffb4ab;
       --warning: #f5b93f;
       --tertiary: #9699ff;
-      --shadow: 0 24px 80px rgba(0, 0, 0, .42);
+      --shadow: 0 30px 90px rgba(0, 0, 0, .56);
       --radius-card: 12px;
       --radius-control: 12px;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -36,73 +36,53 @@
       overflow: hidden;
     }
 
-    button, textarea, input { font: inherit; }
+    button, textarea { font: inherit; }
     button { cursor: pointer; }
 
     .ticker {
       height: 38px;
       display: flex;
       align-items: center;
-      gap: 22px;
+      gap: 26px;
       padding: 0 26px;
       color: var(--tertiary);
       border-bottom: 1px solid #141414;
       white-space: nowrap;
       overflow: hidden;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 800;
       background: #070707;
     }
 
-    .app {
-      height: calc(100vh - 38px);
-      display: grid;
-      grid-template-columns: minmax(360px, 34%) minmax(0, 66%);
-      background:
-        radial-gradient(circle at 26% 18%, rgba(78, 222, 163, .06), transparent 30%),
-        linear-gradient(180deg, #0d0d0d 0%, #080808 100%);
-      overflow: hidden;
-    }
-
     .dashboard {
-      border-right: 1px solid var(--border);
-      min-width: 0;
+      height: calc(100vh - 38px);
       overflow: hidden;
-      padding: 34px 28px 34px 34px;
-      position: relative;
-    }
-
-    .dashboard::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(90deg, transparent 58%, rgba(10, 10, 10, .72));
-      pointer-events: none;
+      padding: 34px max(34px, calc((100vw - 1600px) / 2 + 34px));
+      background:
+        radial-gradient(circle at 75% 30%, rgba(78, 222, 163, .05), transparent 26%),
+        linear-gradient(180deg, #0d0d0d 0%, #080808 100%);
     }
 
     .nav {
       height: 56px;
       display: flex;
       align-items: center;
-      gap: 28px;
+      gap: 44px;
       margin-bottom: 54px;
-      position: relative;
-      z-index: 1;
     }
 
     .brand {
       color: var(--primary);
-      font-size: 25px;
-      font-weight: 900;
-      letter-spacing: 0;
-      margin-right: auto;
+      font-size: 28px;
+      font-weight: 950;
+      margin-right: 52px;
     }
 
     .nav a {
       color: var(--muted);
       text-decoration: none;
       font-size: 14px;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .nav a.active {
@@ -111,12 +91,37 @@
       padding-bottom: 8px;
     }
 
-    .title {
-      position: relative;
-      z-index: 1;
-      margin: 0 0 28px;
+    .nav-tools {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
+    .tool-button {
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 900;
+    }
+
+    .search {
+      width: 240px;
+      height: 44px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      background: var(--surface);
+      font-weight: 800;
+    }
+
+    .title { margin-bottom: 28px; }
     .title h1 {
       margin: 0 0 8px;
       font-size: 34px;
@@ -128,100 +133,139 @@
       margin: 0;
       color: var(--muted);
       font-size: 15px;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .stats {
-      position: relative;
-      z-index: 1;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
+      max-width: 1320px;
       margin-bottom: 18px;
     }
 
-    .stat, .card, .thread-card, .context-card {
+    .stat, .card {
       border: 1px solid var(--border);
       background: rgba(31, 32, 32, .84);
       border-radius: var(--radius-card);
       box-shadow: 0 10px 28px rgba(0,0,0,.18);
     }
 
-    .stat { padding: 16px; min-height: 94px; }
-    .label { color: var(--muted); font-size: 12px; font-weight: 800; margin-bottom: 12px; }
-    .value { font-size: 26px; font-weight: 900; }
+    .stat { padding: 16px; min-height: 104px; }
+    .label { color: var(--muted); font-size: 12px; font-weight: 900; margin-bottom: 12px; }
+    .value { font-size: 26px; font-weight: 950; }
     .value small { font-size: 14px; color: var(--muted); }
-    .bar { height: 7px; background: #2a2a2a; border-radius: 99px; margin-top: 14px; overflow: hidden; }
+    .bar { height: 7px; background: #2a2a2a; border-radius: 99px; margin-top: 14px; overflow: hidden; max-width: 240px; }
     .bar span { display: block; height: 100%; width: 68%; background: var(--primary); }
 
     .cards {
-      position: relative;
-      z-index: 1;
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(220px, 1fr));
       gap: 12px;
+      max-width: 1320px;
     }
 
-    .card { padding: 16px; min-height: 142px; }
-    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .card { padding: 16px; min-height: 196px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 10px; }
     .card h3 { margin: 0; font-size: 17px; }
-    .badge { border: 1px solid currentColor; color: var(--primary); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 800; }
+    .badge { border: 1px solid currentColor; color: var(--primary); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 900; white-space: nowrap; }
     .badge.sell { color: var(--danger); }
-    .price { display: flex; justify-content: space-between; color: var(--muted); font-weight: 800; margin: 8px 0 10px; }
-    .spark { height: 22px; border-radius: 4px; background:
-      linear-gradient(140deg, transparent 0 13%, #656565 14% 16%, transparent 17% 28%, #656565 29% 31%, transparent 32% 44%, #656565 45% 47%, transparent 48% 61%, #656565 62% 64%, transparent 65% 100%); opacity: .72; }
-    .card p { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 10px 0 0; }
+    .badge.neutral { color: var(--muted); }
+    .price { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-weight: 900; margin: 8px 0 12px; }
+    .spark {
+      height: 26px;
+      border-radius: 4px;
+      background:
+        linear-gradient(140deg, transparent 0 13%, #656565 14% 16%, transparent 17% 28%, #656565 29% 31%, transparent 32% 44%, #656565 45% 47%, transparent 48% 61%, #656565 62% 64%, transparent 65% 100%);
+      opacity: .72;
+    }
+    .card p { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 12px 0 0; }
 
-    .chat-shell {
-      min-width: 0;
+    .page-dim {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .08);
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .ai-launcher {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 45;
+      width: 54px;
+      height: 54px;
+      border: 0;
+      border-radius: 18px;
+      background: var(--primary);
+      color: var(--primary-text);
+      font-weight: 950;
+      box-shadow: 0 14px 36px rgba(78, 222, 163, .24);
+    }
+
+    .chat-popup {
+      position: fixed;
+      right: 22px;
+      bottom: 88px;
+      z-index: 50;
+      width: min(980px, calc(100vw - 44px));
+      height: min(760px, calc(100vh - 126px));
+      min-height: 560px;
       display: grid;
-      grid-template-columns: 238px minmax(380px, 1fr) 272px;
+      grid-template-columns: 222px minmax(0, 1fr) 228px;
       background: #0b0b0c;
-      height: 100%;
-      min-height: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
       overflow: hidden;
     }
 
-    .chat-sidebar {
+    .popup-threadbar {
       border-right: 1px solid var(--border);
       background: #0f1010;
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
       min-height: 0;
-      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
     }
 
-    .chat-sidebar-head {
-      padding: 20px 18px 14px;
+    .threadbar-head {
+      padding: 18px 16px 14px;
       border-bottom: 1px solid var(--border);
     }
 
-    .chat-sidebar-head h2 {
-      margin: 0 0 14px;
-      font-size: 18px;
+    .threadbar-head h2 {
+      margin: 0 0 12px;
+      font-size: 17px;
       letter-spacing: 0;
     }
 
     .new-chat {
       width: 100%;
-      height: 42px;
+      height: 40px;
       border: 1px solid var(--border-strong);
       border-radius: var(--radius-control);
       background: var(--primary);
       color: var(--primary-text);
-      font-weight: 900;
+      font-weight: 950;
     }
 
     .thread-list {
-      padding: 12px;
+      padding: 10px;
       display: grid;
       gap: 8px;
+      align-content: start;
       overflow: auto;
     }
 
+    .thread-card, .context-card {
+      border: 1px solid var(--border);
+      background: rgba(31, 32, 32, .84);
+      border-radius: var(--radius-card);
+    }
+
     .thread-card {
-      padding: 12px;
+      padding: 11px;
       text-align: left;
       color: var(--text);
       transition: border-color .18s ease, background .18s ease;
@@ -233,8 +277,8 @@
       background: rgba(78, 222, 163, .08);
     }
 
-    .thread-title { font-weight: 900; font-size: 13px; margin-bottom: 5px; }
-    .thread-meta { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .thread-title { font-weight: 950; font-size: 12.5px; margin-bottom: 5px; }
+    .thread-meta { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
 
     .chat-main {
       display: grid;
@@ -249,9 +293,9 @@
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
-      padding: 0 22px;
-      gap: 14px;
-      background: rgba(15, 16, 16, .96);
+      padding: 0 18px;
+      gap: 12px;
+      background: rgba(15, 16, 16, .98);
     }
 
     .avatar {
@@ -263,19 +307,27 @@
       background: var(--primary);
       color: var(--primary-text);
       font-weight: 950;
+      flex: 0 0 auto;
     }
 
-    .chat-header h2 {
+    .chat-title { min-width: 0; }
+    .chat-title h2 {
       margin: 0;
-      font-size: 16px;
+      font-size: 15px;
       letter-spacing: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .chat-header p {
+    .chat-title p {
       margin: 3px 0 0;
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 11.5px;
+      font-weight: 800;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .header-actions {
@@ -285,22 +337,22 @@
     }
 
     .icon-button {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 9px;
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--text);
-      font-weight: 900;
+      font-weight: 950;
     }
 
     .messages {
       min-height: 0;
       overflow: auto;
-      padding: 26px clamp(20px, 4vw, 54px) 24px;
+      padding: 22px clamp(16px, 3vw, 34px) 20px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 16px;
       background:
         linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
@@ -311,32 +363,49 @@
       align-self: center;
       color: var(--subtle);
       font-size: 12px;
-      font-weight: 800;
+      font-weight: 900;
       border: 1px solid var(--border);
-      background: rgba(17,17,18,.86);
+      background: rgba(17,17,18,.9);
       border-radius: 999px;
       padding: 6px 12px;
     }
 
     .message {
       display: grid;
-      grid-template-columns: 36px minmax(0, 720px);
-      gap: 12px;
+      grid-template-columns: 34px minmax(0, 640px);
+      gap: 11px;
       align-items: start;
     }
 
     .message.user {
       align-self: flex-end;
-      grid-template-columns: minmax(0, 620px) 36px;
+      grid-template-columns: minmax(0, 520px) 34px;
+    }
+
+    .mini-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      background: var(--surface-high);
+      color: var(--muted);
+      font-weight: 950;
+      font-size: 12px;
+    }
+
+    .user .mini-avatar {
+      background: rgba(78, 222, 163, .16);
+      color: var(--primary);
     }
 
     .bubble {
       border: 1px solid var(--border);
       border-radius: 14px;
       background: #151616;
-      padding: 14px 15px;
+      padding: 13px 14px;
       line-height: 1.6;
-      font-size: 14px;
+      font-size: 13.5px;
       box-shadow: 0 12px 24px rgba(0,0,0,.16);
     }
 
@@ -345,24 +414,8 @@
       border-color: rgba(78, 222, 163, .28);
     }
 
-    .message .mini-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      background: var(--surface-high);
-      color: var(--muted);
-      font-weight: 900;
-    }
-
-    .user .mini-avatar {
-      background: rgba(78, 222, 163, .16);
-      color: var(--primary);
-    }
-
     .sources {
-      margin-top: 12px;
+      margin-top: 11px;
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
@@ -374,19 +427,19 @@
       padding: 6px 9px;
       color: var(--muted);
       background: rgba(255,255,255,.03);
-      font-size: 12px;
-      font-weight: 800;
+      font-size: 11.5px;
+      font-weight: 900;
     }
 
     .decision-row {
       display: grid;
-      grid-template-columns: 90px 1fr auto;
+      grid-template-columns: 78px 1fr auto;
       gap: 10px;
       align-items: center;
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid var(--border);
-      font-size: 13px;
+      font-size: 12.5px;
     }
 
     .risk-meter {
@@ -405,7 +458,7 @@
 
     .composer {
       border-top: 1px solid var(--border);
-      padding: 14px 18px 16px;
+      padding: 12px 14px 14px;
       background: rgba(15,16,16,.98);
     }
 
@@ -413,19 +466,19 @@
       display: flex;
       gap: 8px;
       overflow-x: auto;
-      padding-bottom: 10px;
+      padding-bottom: 9px;
     }
 
     .quick-actions button {
       flex: 0 0 auto;
-      height: 34px;
+      height: 32px;
       border: 1px solid var(--border);
       background: var(--surface);
       color: var(--muted);
       border-radius: 999px;
-      padding: 0 12px;
-      font-size: 12px;
-      font-weight: 800;
+      padding: 0 11px;
+      font-size: 11.5px;
+      font-weight: 900;
     }
 
     .composer-box {
@@ -440,8 +493,8 @@
     }
 
     textarea {
-      min-height: 62px;
-      max-height: 140px;
+      min-height: 56px;
+      max-height: 132px;
       resize: vertical;
       width: 100%;
       border: 0;
@@ -454,8 +507,8 @@
     textarea::placeholder { color: var(--subtle); }
 
     .send {
-      width: 44px;
-      height: 44px;
+      width: 42px;
+      height: 42px;
       border: 0;
       border-radius: 12px;
       background: var(--primary);
@@ -468,7 +521,7 @@
       background: #0f1010;
       min-width: 0;
       overflow: auto;
-      padding: 18px;
+      padding: 16px;
     }
 
     .context-panel h3 {
@@ -476,29 +529,11 @@
       font-size: 14px;
     }
 
-    .context-card {
-      padding: 13px;
-      margin-bottom: 10px;
-    }
-
-    .context-card strong {
-      display: block;
-      font-size: 13px;
-      margin-bottom: 6px;
-    }
-
-    .context-card p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.45;
-    }
-
     .scope-toggle {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
       padding: 4px;
       border-radius: 12px;
       background: #151616;
@@ -506,18 +541,36 @@
     }
 
     .scope-toggle button {
-      height: 34px;
+      height: 32px;
       border: 0;
       border-radius: 9px;
       background: transparent;
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 900;
+      font-size: 11.5px;
+      font-weight: 950;
     }
 
     .scope-toggle button.active {
       background: var(--primary);
       color: var(--primary-text);
+    }
+
+    .context-card {
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .context-card strong {
+      display: block;
+      font-size: 12.5px;
+      margin-bottom: 6px;
+    }
+
+    .context-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.45;
     }
 
     .mini-table {
@@ -527,10 +580,10 @@
 
     .mini-row {
       display: grid;
-      grid-template-columns: 52px 1fr auto;
+      grid-template-columns: 48px 1fr auto;
       gap: 8px;
       align-items: center;
-      font-size: 12px;
+      font-size: 11.5px;
       color: var(--muted);
     }
 
@@ -547,59 +600,46 @@
 
     .empty-note {
       color: var(--subtle);
-      font-size: 12px;
+      font-size: 11.5px;
       line-height: 1.45;
       padding: 10px 0;
     }
 
-    @media (max-width: 1120px) {
-      body { overflow: auto; }
-      .app {
-        height: auto;
-        min-height: calc(100vh - 38px);
-        grid-template-columns: 1fr;
+    @media (max-width: 1180px) {
+      .chat-popup {
+        grid-template-columns: 198px minmax(0, 1fr);
+        width: min(820px, calc(100vw - 34px));
       }
-      .dashboard {
-        display: none;
-      }
-      .chat-shell {
-        min-height: calc(100vh - 38px);
-        grid-template-columns: 230px minmax(0, 1fr);
-      }
-      .context-panel {
-        display: none;
-      }
+      .context-panel { display: none; }
     }
 
-    @media (max-width: 760px) {
-      .ticker { height: 34px; padding: 0 12px; font-size: 12px; }
-      .chat-shell {
+    @media (max-width: 780px) {
+      body { overflow: auto; }
+      .dashboard {
+        min-height: calc(100vh - 38px);
+        height: auto;
+        padding: 24px 14px 120px;
+      }
+      .nav { gap: 18px; margin-bottom: 34px; }
+      .brand { font-size: 22px; margin-right: auto; }
+      .search, .nav-tools { display: none; }
+      .stats, .cards { grid-template-columns: 1fr; }
+      .chat-popup {
+        inset: 10px;
+        width: auto;
+        height: auto;
+        min-height: 0;
         grid-template-columns: 1fr;
+        border-radius: 16px;
       }
-      .chat-sidebar {
-        display: none;
-      }
-      .chat-header {
-        height: 64px;
-        padding: 0 14px;
-      }
-      .messages {
-        padding: 18px 14px;
-      }
-      .message, .message.user {
-        grid-template-columns: 1fr;
-      }
-      .mini-avatar {
-        display: none !important;
-      }
-      .composer {
-        padding: 10px;
-        position: sticky;
-        bottom: 0;
-      }
-      .decision-row {
-        grid-template-columns: 1fr;
-      }
+      .popup-threadbar { display: none; }
+      .chat-header { height: 64px; padding: 0 14px; }
+      .messages { padding: 18px 14px; }
+      .message, .message.user { grid-template-columns: 1fr; }
+      .mini-avatar { display: none; }
+      .decision-row { grid-template-columns: 1fr; }
+      .composer { padding: 10px; }
+      .ai-launcher { display: none; }
     }
   </style>
 </head>
@@ -612,188 +652,185 @@
     <span>Scheduler: Next run 08:30</span>
   </div>
 
-  <main class="app">
-    <section class="dashboard" aria-label="Trading24 dashboard preview">
-      <nav class="nav">
-        <div class="brand">TRADING24</div>
-        <a class="active" href="#">总览</a>
-        <a href="#">分析</a>
-        <a href="#">关注</a>
-      </nav>
-
-      <div class="title">
-        <h1>关注列表总览</h1>
-        <p>基于每日智能体分析的高优先级标的。</p>
+  <main class="dashboard" aria-label="Trading24 dashboard preview">
+    <nav class="nav">
+      <div class="brand">TRADING24</div>
+      <a class="active" href="#">总览</a>
+      <a href="#">分析</a>
+      <a href="#">关注</a>
+      <div class="nav-tools">
+        <button class="tool-button" title="设置">⚙</button>
+        <button class="tool-button" title="主题">☼</button>
+        <div class="search">搜索代码...</div>
       </div>
+    </nav>
 
-      <div class="stats">
-        <div class="stat">
-          <div class="label">今日运行 · 待运行</div>
-          <div class="value">3 <small>/ 6 已完成</small></div>
-          <div class="bar"><span></span></div>
-        </div>
-        <div class="stat">
-          <div class="label">今日决策分布</div>
-          <div class="value">1 <small>增持</small></div>
-        </div>
-        <div class="stat">
-          <div class="label">近期提醒</div>
-          <div class="value">3 <small>条</small></div>
-        </div>
+    <section class="title">
+      <h1>关注列表总览</h1>
+      <p>基于每日智能体分析的高优先级标的。</p>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        <div class="label">今日运行 · 待运行</div>
+        <div class="value">3 <small>/ 6 已完成</small></div>
+        <div class="bar"><span></span></div>
       </div>
-
-      <div class="cards">
-        <article class="card">
-          <div class="card-head"><h3>美光科技</h3><span class="badge">增持</span></div>
-          <div class="price"><span>MU · NASDAQ</span><span>$975.56 -5.49%</span></div>
-          <div class="spark"></div>
-          <p>基本面被极端错杀，等待 900-950 区间缩量企稳后首笔建仓。</p>
-        </article>
-        <article class="card">
-          <div class="card-head"><h3>小米集团-W</h3><span class="badge sell">减持</span></div>
-          <div class="price"><span>1810.HK · HKEX</span><span>HK$22.60 +4.44%</span></div>
-          <div class="spark"></div>
-          <p>汽车业务亏损仍未收窄，建议持仓减至原仓位的 30%-50%。</p>
-        </article>
-        <article class="card">
-          <div class="card-head"><h3>英伟达</h3><span class="badge sell">减持</span></div>
-          <div class="price"><span>NVDA · NASDAQ</span><span>$194.83 -1.39%</span></div>
-          <div class="spark"></div>
-          <p>199-203 美元阻力区反弹偏弱，仓位建议降至基准权重 60%-70%。</p>
-        </article>
-        <article class="card">
-          <div class="card-head"><h3>腾讯</h3><span class="badge" style="color: var(--muted)">中性</span></div>
-          <div class="price"><span>0700.HK · HKEX</span><span>HK$425.20 +1.19%</span></div>
-          <div class="spark"></div>
-          <p>维持现有仓位，广告增长抵消游戏业务短期波动。</p>
-        </article>
+      <div class="stat">
+        <div class="label">今日决策分布</div>
+        <div class="value">1 <small>增持</small></div>
+      </div>
+      <div class="stat">
+        <div class="label">近期提醒</div>
+        <div class="value">3 <small>条 · 最新 TSLA 减持</small></div>
       </div>
     </section>
 
-    <section class="chat-shell" aria-label="Trading24 chatbot demo">
-      <aside class="chat-sidebar">
-        <div class="chat-sidebar-head">
-          <h2>AI 助手</h2>
-          <button class="new-chat" id="newChat">新对话</button>
-        </div>
-        <div class="thread-list">
-          <button class="thread-card active" data-thread="overview">
-            <div class="thread-title">今日关注列表复盘</div>
-            <div class="thread-meta">全部关注列表 · 6 只 · 刚刚</div>
-          </button>
-          <button class="thread-card" data-thread="nvda">
-            <div class="thread-title">NVDA 阻力位和仓位</div>
-            <div class="thread-meta">英伟达 · 最近成功记录</div>
-          </button>
-          <button class="thread-card" data-thread="risk">
-            <div class="thread-title">组合风险排序</div>
-            <div class="thread-meta">TSLA / 1810.HK / NVDA</div>
-          </button>
-          <button class="thread-card" data-thread="mu">
-            <div class="thread-title">MU 为什么还增持</div>
-            <div class="thread-meta">基本面 vs 技术面分歧</div>
-          </button>
-        </div>
-      </aside>
-
-      <section class="chat-main">
-        <header class="chat-header">
-          <div class="avatar">AI</div>
-          <div>
-            <h2>今日关注列表复盘</h2>
-            <p>分析范围：全部关注列表 · 6 只 · 使用最新成功记录</p>
-          </div>
-          <div class="header-actions" aria-label="chat actions">
-            <button class="icon-button" title="选择记录">≡</button>
-            <button class="icon-button" title="新对话">＋</button>
-          </div>
-        </header>
-
-        <div class="messages" id="messages">
-          <div class="day-divider">今天 00:08</div>
-
-          <div class="message">
-            <div class="mini-avatar">AI</div>
-            <div class="bubble">
-              我已经读取了今天关注列表的最新分析。可以直接问“谁最该关注”“风险最高是谁”“把结论汇总成一段”，也可以指定某只股票追问。
-              <div class="sources">
-                <span class="source-chip">MU · 13h ago</span>
-                <span class="source-chip">NVDA · 5h ago</span>
-                <span class="source-chip">TSLA · Just now</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="message user">
-            <div class="bubble">今天最该关注哪只？为什么？</div>
-            <div class="mini-avatar">你</div>
-          </div>
-
-          <div class="message">
-            <div class="mini-avatar">AI</div>
-            <div class="bubble">
-              今天最值得优先盯的是 <strong>TSLA</strong>，不是因为它最有机会，而是因为它的事件风险和技术破位风险最高。当前建议是把反弹区间 400-420 美元当作减仓窗口，450 美元上方才说明空头判断失效。
-              <div class="decision-row">
-                <strong>风险压力</strong>
-                <div class="risk-meter"><span></span></div>
-                <span>高</span>
-              </div>
-              <div class="sources">
-                <span class="source-chip">最终决策 · TSLA</span>
-                <span class="source-chip">技术面 · RSI / MACD</span>
-                <span class="source-chip">风险复核</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <form class="composer" id="chatForm">
-          <div class="quick-actions">
-            <button type="button" data-prompt="这些标的里谁的风险最高？">谁风险最高？</button>
-            <button type="button" data-prompt="把各只的决策和理由汇总成一段">汇总成一段</button>
-            <button type="button" data-prompt="NVDA 现在应该减到多少仓位？">追问 NVDA</button>
-            <button type="button" data-prompt="MU 为什么技术面很差还维持增持？">解释分歧</button>
-          </div>
-          <div class="composer-box">
-            <textarea id="prompt" placeholder="问我关于这些分析的任何问题..."></textarea>
-            <button class="send" type="submit" title="发送">↑</button>
-          </div>
-        </form>
-      </section>
-
-      <aside class="context-panel">
-        <h3>上下文</h3>
-        <div class="scope-toggle">
-          <button class="active">自动</button>
-          <button>手动选择</button>
-        </div>
-
-        <div class="context-card">
-          <strong>当前范围</strong>
-          <p>全部关注列表 · 6 只股票 · 每只使用最近一条成功分析记录。</p>
-        </div>
-
-        <div class="context-card">
-          <strong>决策分布</strong>
-          <div class="mini-table">
-            <div class="mini-row"><span><i class="dot"></i>MU</span><span>增持</span><strong>13h</strong></div>
-            <div class="mini-row"><span><i class="dot sell"></i>TSLA</span><span>减持</span><strong>now</strong></div>
-            <div class="mini-row"><span><i class="dot sell"></i>NVDA</span><span>减持</span><strong>5h</strong></div>
-            <div class="mini-row"><span>0700.HK</span><span>中性</span><strong>3d</strong></div>
-          </div>
-        </div>
-
-        <div class="context-card">
-          <strong>聊天模式改造重点</strong>
-          <p>消息流成为主界面；输入框固定底部；历史会话可切换；引用记录独立显示；不再用右下小面板承载复杂问答。</p>
-        </div>
-
-        <div class="empty-note">
-          正式接入时，这里可以放“被引用的 run_id、报告段落、价格快照、手动选择记录”等可追溯上下文。
-        </div>
-      </aside>
+    <section class="cards">
+      <article class="card">
+        <div class="card-head"><h3>美光科技</h3><span class="badge">增持</span></div>
+        <div class="price"><span>MU · NASDAQ</span><span>$975.56 -5.49%</span></div>
+        <div class="spark"></div>
+        <p>基本面被极端错杀，等待 900-950 区间缩量企稳后首笔建仓。</p>
+      </article>
+      <article class="card">
+        <div class="card-head"><h3>小米集团-W</h3><span class="badge sell">减持</span></div>
+        <div class="price"><span>1810.HK · HKEX</span><span>HK$22.60 +4.44%</span></div>
+        <div class="spark"></div>
+        <p>汽车业务亏损仍未收窄，建议持仓减至原仓位的 30%-50%。</p>
+      </article>
+      <article class="card">
+        <div class="card-head"><h3>特斯拉</h3><span class="badge sell">减持</span></div>
+        <div class="price"><span>TSLA · NASDAQ</span><span>$393.45 -7.49%</span></div>
+        <div class="spark"></div>
+        <p>反弹至 400-420 美元阻力区时减仓，止损设在 450 美元。</p>
+      </article>
+      <article class="card">
+        <div class="card-head"><h3>腾讯</h3><span class="badge neutral">中性</span></div>
+        <div class="price"><span>0700.HK · HKEX</span><span>HK$425.20 +1.19%</span></div>
+        <div class="spark"></div>
+        <p>维持现有仓位，广告增长抵消游戏业务短期波动。</p>
+      </article>
     </section>
   </main>
+
+  <div class="page-dim" aria-hidden="true"></div>
+  <button class="ai-launcher" title="AI 助手">AI</button>
+
+  <section class="chat-popup" aria-label="AI assistant popup">
+    <aside class="popup-threadbar">
+      <div class="threadbar-head">
+        <h2>AI 助手</h2>
+        <button class="new-chat" id="newChat">新对话</button>
+      </div>
+      <div class="thread-list">
+        <button class="thread-card active" data-thread="overview">
+          <div class="thread-title">今日关注列表复盘</div>
+          <div class="thread-meta">全部关注列表 · 6 只 · 刚刚</div>
+        </button>
+        <button class="thread-card" data-thread="nvda">
+          <div class="thread-title">NVDA 阻力位和仓位</div>
+          <div class="thread-meta">英伟达 · 最近成功记录</div>
+        </button>
+        <button class="thread-card" data-thread="risk">
+          <div class="thread-title">组合风险排序</div>
+          <div class="thread-meta">TSLA / 1810.HK / NVDA</div>
+        </button>
+        <button class="thread-card" data-thread="mu">
+          <div class="thread-title">MU 为什么还增持</div>
+          <div class="thread-meta">基本面 vs 技术面分歧</div>
+        </button>
+      </div>
+    </aside>
+
+    <section class="chat-main">
+      <header class="chat-header">
+        <div class="avatar">AI</div>
+        <div class="chat-title">
+          <h2>今日关注列表复盘</h2>
+          <p>弹窗模式 · 全部关注列表 · 6 只 · 使用最新成功记录</p>
+        </div>
+        <div class="header-actions" aria-label="chat actions">
+          <button class="icon-button" title="上下文">≡</button>
+          <button class="icon-button" title="关闭">×</button>
+        </div>
+      </header>
+
+      <div class="messages" id="messages">
+        <div class="day-divider">今天 00:22</div>
+        <div class="message">
+          <div class="mini-avatar">AI</div>
+          <div class="bubble">
+            我已经读取了今天关注列表的最新分析。这个版本仍然是页面上的弹窗，但内部结构更接近聊天软件：左侧会话、中间消息流、右侧上下文。
+            <div class="sources">
+              <span class="source-chip">MU · 13h ago</span>
+              <span class="source-chip">NVDA · 5h ago</span>
+              <span class="source-chip">TSLA · Just now</span>
+            </div>
+          </div>
+        </div>
+        <div class="message user">
+          <div class="bubble">今天最该关注哪只？为什么？</div>
+          <div class="mini-avatar">你</div>
+        </div>
+        <div class="message">
+          <div class="mini-avatar">AI</div>
+          <div class="bubble">
+            今天最值得优先盯的是 <strong>TSLA</strong>。它不是机会最高，而是事件风险和技术破位风险最高。当前建议是把反弹区间 400-420 美元当作减仓窗口，450 美元上方才说明空头判断失效。
+            <div class="decision-row">
+              <strong>风险压力</strong>
+              <div class="risk-meter"><span></span></div>
+              <span>高</span>
+            </div>
+            <div class="sources">
+              <span class="source-chip">最终决策 · TSLA</span>
+              <span class="source-chip">技术面 · RSI / MACD</span>
+              <span class="source-chip">风险复核</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form class="composer" id="chatForm">
+        <div class="quick-actions">
+          <button type="button" data-prompt="这些标的里谁的风险最高？">谁风险最高？</button>
+          <button type="button" data-prompt="把各只的决策和理由汇总成一段">汇总成一段</button>
+          <button type="button" data-prompt="NVDA 现在应该减到多少仓位？">追问 NVDA</button>
+          <button type="button" data-prompt="MU 为什么技术面很差还维持增持？">解释分歧</button>
+        </div>
+        <div class="composer-box">
+          <textarea id="prompt" placeholder="问我关于这些分析的任何问题..."></textarea>
+          <button class="send" type="submit" title="发送">↑</button>
+        </div>
+      </form>
+    </section>
+
+    <aside class="context-panel">
+      <h3>上下文</h3>
+      <div class="scope-toggle">
+        <button class="active">自动</button>
+        <button>手动选择</button>
+      </div>
+      <div class="context-card">
+        <strong>当前范围</strong>
+        <p>全部关注列表 · 6 只股票 · 每只使用最近一条成功分析记录。</p>
+      </div>
+      <div class="context-card">
+        <strong>决策分布</strong>
+        <div class="mini-table">
+          <div class="mini-row"><span><i class="dot"></i>MU</span><span>增持</span><strong>13h</strong></div>
+          <div class="mini-row"><span><i class="dot sell"></i>TSLA</span><span>减持</span><strong>now</strong></div>
+          <div class="mini-row"><span><i class="dot sell"></i>NVDA</span><span>减持</span><strong>5h</strong></div>
+          <div class="mini-row"><span>0700.HK</span><span>中性</span><strong>3d</strong></div>
+        </div>
+      </div>
+      <div class="context-card">
+        <strong>弹窗式聊天改造</strong>
+        <p>载体仍是页面浮层；打开时不改变仪表盘布局；输入区固定底部；上下文放在弹窗内部。</p>
+      </div>
+      <div class="empty-note">正式接入时，这里显示引用 run_id、报告段落、价格快照和手动选择记录。</div>
+    </aside>
+  </section>
 
   <script>
     const messages = document.querySelector("#messages");
@@ -804,10 +841,10 @@
     const newChat = document.querySelector("#newChat");
 
     const replies = [
-      "从当前记录看，风险最高的是 TSLA，其次是小米和 NVDA。TSLA 的问题是反弹接近阻力区，但基本面事件仍未释放；小米是估值和汽车亏损压力；NVDA 是阻力位附近反弹质量不够。",
+      "从当前记录看，风险最高的是 TSLA，其次是小米和 NVDA。TSLA 的问题是反弹接近阻力区，但基本面事件仍未释放。",
       "一句话总结：MU 是基本面便宜但需要等技术面企稳；TSLA 和小米偏减仓防守；NVDA 反弹到阻力位时降低仓位；腾讯维持中性观察。",
-      "如果只看 NVDA，当前更像减到基准权重的 60%-70%，等待 199-203 美元阻力区是否有效突破；如果突破失败，继续保持防守。",
-      "MU 的核心分歧是：基本面估值和现金流很强，但短线技术面显著恶化。所以建议不是追涨，而是在 900-950 美元区间等缩量企稳后分批建仓。"
+      "如果只看 NVDA，当前更像减到基准权重的 60%-70%，等待 199-203 美元阻力区是否有效突破。",
+      "MU 的核心分歧是：基本面估值和现金流很强，但短线技术面显著恶化，所以只适合等缩量企稳后分批建仓。"
     ];
 
     function addMessage(role, text) {
@@ -819,11 +856,8 @@
       const avatar = document.createElement("div");
       avatar.className = "mini-avatar";
       avatar.textContent = role === "user" ? "你" : "AI";
-      if (role === "user") {
-        wrap.append(bubble, avatar);
-      } else {
-        wrap.append(avatar, bubble);
-      }
+      if (role === "user") wrap.append(bubble, avatar);
+      else wrap.append(avatar, bubble);
       messages.appendChild(wrap);
       messages.scrollTop = messages.scrollHeight;
     }
@@ -833,10 +867,7 @@
       if (!text) return;
       addMessage("user", text);
       prompt.value = "";
-      window.setTimeout(() => {
-        const reply = replies[Math.floor(Math.random() * replies.length)];
-        addMessage("assistant", reply);
-      }, 420);
+      window.setTimeout(() => addMessage("assistant", replies[Math.floor(Math.random() * replies.length)]), 360);
     }
 
     form.addEventListener("submit", (event) => {
@@ -852,13 +883,13 @@
       thread.addEventListener("click", () => {
         threads.forEach((item) => item.classList.remove("active"));
         thread.classList.add("active");
-        addMessage("assistant", `已切换到「${thread.querySelector(".thread-title").textContent}」这条会话。正式版本里这里会加载对应历史消息和上下文记录。`);
+        addMessage("assistant", `已切换到「${thread.querySelector(".thread-title").textContent}」。正式版本会加载这条会话的历史消息和上下文。`);
       });
     });
 
     newChat.addEventListener("click", () => {
       messages.innerHTML = '<div class="day-divider">新对话</div>';
-      addMessage("assistant", "新对话已创建。你可以选择自动上下文，也可以从右侧手动选择分析记录后再提问。");
+      addMessage("assistant", "新对话已创建。弹窗仍停留在当前页面上，不会改变仪表盘布局。");
       prompt.focus();
     });
   </script>
