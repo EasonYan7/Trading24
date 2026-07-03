@@ -1831,7 +1831,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
             position: fixed;
             right: 20px;
             bottom: 20px;
-            z-index: 1002;
+            z-index: 2147482000;
             width: 52px;
         }
         .st-key-t24_ai_launcher button {
@@ -1870,7 +1870,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
             width: 356px;
             height: 492px;
             overflow: auto;
-            z-index: 1002;
+            z-index: 2147483000;
             background:var(--t24-surface);
             border:1px solid var(--t24-border-strong);
             border-top: none;
@@ -1882,7 +1882,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
         /* sticky 头部：滚动时始终可见 */
         /* 固定头部（独立于滚动面板，永远可见） */
         .st-key-t24_ai_header {
-            position: fixed; right: 20px; bottom: 512px; width: 356px; z-index: 1003;
+            position: fixed; right: 20px; bottom: 512px; width: 356px; z-index: 2147483001;
             background: var(--t24-surface);
             border: 1px solid var(--t24-border-strong); border-bottom: 1px solid var(--t24-border);
             border-radius: 14px 14px 0 0; padding: 8px 12px 6px;
@@ -3860,21 +3860,6 @@ def render_ai_plugin():
 
     if not st.session_state.ai_panel_open:
         return
-
-    # 面板打开时给居中主容器留出右侧空间，避免固定浮层盖住右列的管理按钮
-    # （只在桌面生效；小屏面板是全屏模态，不需要留白）
-    st.markdown(
-        """
-        <style>
-        @media (min-width: 761px) {
-          .block-container {
-            padding-right: max(1rem, calc(392px - var(--t24-gutter))) !important;
-          }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
     detail = st.session_state.get("detail")
     default_ids = default_ai_run_ids()
