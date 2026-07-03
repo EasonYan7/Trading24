@@ -4,7 +4,12 @@
 !.env.example
 
 # 运行时数据 / 数据库
-data/
+data/*
+!data/
+!data/trading24.sqlite
+data/*.log
+data/*.sqlite-wal
+data/*.sqlite-shm
 
 # Python
 __pycache__/

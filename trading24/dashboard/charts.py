@@ -125,25 +125,18 @@ def build_trend_figure(prices: list[dict], runs: list, theme: dict | None = None
     yrange = [min(vals) * 0.97, max(vals) * 1.03] if vals else None
 
     fig.add_trace(go.Scatter(x=dates, y=close, name="收盘价", mode="lines",
-                             line=dict(color=t["primary"], width=2.2),
-                             fill="tozeroy", fillcolor=_rgba(t["primary"], 0.10)))
+                             line=dict(color=t["muted"], width=2.2),
+                             fill="tozeroy", fillcolor=_rgba(t["muted"], 0.08)))
     if any(v is not None for v in ma20):
         fig.add_trace(go.Scatter(x=dates, y=ma20, name="MA20", mode="lines",
                                  line=dict(color=t["subtle"], width=1.4, dash="dash")))
 
-    # 决策标记：按 trade_date 落在价格曲线上
-    grouped: dict[str, list] = {}
-    for r in runs:
-        if getattr(r, "status", "") != "success":
-            continue
-        dec = _norm_decision(getattr(r, "decision", None))
-        if dec and r.trade_date in close_by_date:
-            grouped.setdefault(dec, []).append(r.trade_date)
-
-    for dec, ds in grouped.items():
+    # 决策标记：按 trade_date 落在价格曲线上（无当日价格快照时回退到最近的前一交易日）
+    for dec, points in _decision_points(prices, runs).items():
         style = decision_style[dec]
         fig.add_trace(go.Scatter(
-            x=ds, y=[close_by_date[d] for d in ds], name=DECISION_LABEL.get(dec, dec), mode="markers",
+            x=[d for d, _ in points], y=[y for _, y in points],
+            name=DECISION_LABEL.get(dec, dec), mode="markers",
             marker=dict(symbol=style["symbol"], color=style["color"], size=13,
                         line=dict(width=1, color=t["border"])),
         ))

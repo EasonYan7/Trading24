@@ -10,7 +10,9 @@ import importlib
 import os
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
+from urllib.parse import quote
 
 import bleach
 import httpx
@@ -19,7 +21,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_sortables import sort_items
 
-from trading24.config import load_settings, load_watchlist, save_watchlist, TickerCfg, market_of
+from trading24.config import (
+    load_settings, save_settings, Settings,
+    load_watchlist, save_watchlist, TickerCfg, market_of,
+)
 from trading24.db import database as db
 from trading24.db.models import Run
 from trading24 import prices, runner
@@ -104,6 +109,10 @@ THEME_CSS = f"""
   --t24-radius-control: 12px;
   --t24-radius-card: 12px;
   --t24-control-height: 44px;
+  /* 主内容区宽度：流式，跟随视口放大、封顶 1600；两侧留白由 gutter 统一推导，
+     固定定位的 Pipeline 左栏 / AI 面板留白都引用它，避免魔法数 1260 漂移 */
+  --t24-shell: min(1600px, 94vw);
+  --t24-gutter: calc((100vw - var(--t24-shell)) / 2);
 }}
 </style>
 """
@@ -163,7 +172,7 @@ header.stAppHeader,
   display:none !important;
 }
 .block-container {
-  max-width:1260px;
+  max-width:var(--t24-shell);
   padding-top:0 !important;
   padding-bottom:3.2rem;
 }
@@ -242,6 +251,15 @@ header.stAppHeader,
   border-radius:var(--t24-radius-control) !important;
   min-height:var(--t24-control-height);
 }
+[data-testid="stTextInput"] input:disabled,
+[data-testid="stNumberInput"] input:disabled,
+[data-testid="stTextArea"] textarea:disabled {
+  opacity:0.6 !important;
+  color:var(--t24-muted) !important;
+  -webkit-text-fill-color:var(--t24-muted) !important;
+  background:var(--t24-surface-low) !important;
+  border-color:var(--t24-border) !important;
+}
 [data-testid="stTextInput"] input:focus,
 [data-testid="stNumberInput"] input:focus,
 [data-testid="stTextArea"] textarea:focus {
@@ -253,6 +271,13 @@ header.stAppHeader,
   border-color:var(--t24-border) !important;
   color:var(--t24-text) !important;
   border-radius:10px !important;
+}
+[data-testid="stNumberInput"] button:disabled {
+  opacity:1 !important;
+  color:var(--t24-subtle) !important;
+  background:var(--t24-surface-low) !important;
+  border-color:var(--t24-border) !important;
+  cursor:not-allowed;
 }
 .mono { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; }
 .caps {
@@ -336,6 +361,29 @@ header.stAppHeader,
   line-height:1.55;
   color:var(--t24-muted);
 }
+/* 总览页：顶部摘要条 + 紧凑公司卡片网格（响应式，跟随宽度 2~4 列） */
+.t24-ov-summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin:0 0 16px; }
+.t24-ov-tile { background:var(--t24-surface-high); border-radius:12px; padding:14px 16px; }
+.t24-ov-tile-label { font-size:13px; color:var(--t24-muted); margin-bottom:6px; }
+.t24-ov-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:12px; }
+.t24-ov-card { display:block; color:inherit; background:var(--t24-surface);
+  border:1px solid var(--t24-border); border-radius:12px; padding:14px 16px; box-shadow:var(--t24-shadow);
+  transition:border-color .15s ease, background .15s ease; }
+.t24-ov-card, .t24-ov-card:hover, .t24-ov-card * { text-decoration:none !important; }
+.t24-ov-card:hover { border-color:var(--t24-border-strong); background:var(--t24-surface-high); }
+.t24-ov-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.t24-ov-name { font-size:16px; font-weight:700; color:var(--t24-text); line-height:1.2;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.t24-ov-meta { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-top:4px; }
+.t24-ov-code { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:12px; color:var(--t24-muted); white-space:nowrap; }
+.t24-ov-price { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:15px; color:var(--t24-text); }
+.t24-ov-delta { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:12px; }
+.t24-ov-spark { width:100%; height:30px; margin:8px 0; display:block; }
+.t24-ov-concl { font-size:13px; color:var(--t24-muted); line-height:1.5; min-height:39px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.t24-ov-foot { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+.t24-ov-foot-age { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:11px; color:var(--t24-muted); }
+.t24-ov-foot-cta { font-size:12px; color:var(--t24-primary); white-space:nowrap; }
 .t24-page-title {
   font-size:30px;
   font-weight:800;
@@ -422,13 +470,27 @@ button[data-testid^="stBaseButton"]:focus-visible {
   line-height:32px;
   min-height:32px;
   margin:0 -16px;
-  padding:0 16px;
+  padding:0;
   color:var(--t24-tertiary);
   background:var(--t24-surface-low);
   border-bottom:1px solid var(--t24-border);
-  white-space:nowrap;
   overflow:hidden;
-  text-overflow:ellipsis;
+}
+.t24-tape-track {
+  display:flex;
+  width:max-content;
+  white-space:nowrap;
+  will-change:transform;
+  animation:t24-marquee 48s linear infinite;
+}
+.t24-tape:hover .t24-tape-track { animation-play-state:paused; }
+.t24-tape-seg { flex:0 0 auto; padding-left:16px; }
+@keyframes t24-marquee {
+  from { transform:translateX(0); }
+  to   { transform:translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t24-tape-track { animation:none; }
 }
 .t24-topbar {
   display:flex;
@@ -441,6 +503,10 @@ button[data-testid^="stBaseButton"]:focus-visible {
 }
 .st-key-t24_topnav {
   margin:0 -16px 28px;
+  /* stVerticalBlock 自带 width:100% + max-width:100%，负右边距无法把右缘拉出去，
+     需显式加宽 32px（左右各 16）并解除 max-width，否则右缘停在内容宽度、与全宽行情条对不齐 */
+  width:calc(100% + 32px);
+  max-width:none;
   padding:12px 16px;
   background:var(--t24-surface);
   border-bottom:1px solid var(--t24-border);
@@ -540,6 +606,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
 }
 .st-key-theme_toggle_dark button,
 .st-key-theme_toggle_light button,
+.st-key-open_settings button,
 .st-key-open_ai_from_nav button {
   min-width:44px !important;
   width:44px !important;
@@ -556,6 +623,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
 }
 .st-key-theme_toggle_dark button::before,
 .st-key-theme_toggle_light button::before,
+.st-key-open_settings button::before,
 .st-key-open_ai_from_nav button::before {
   content:"";
   display:block;
@@ -571,6 +639,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
 }
 .st-key-theme_toggle_dark button *,
 .st-key-theme_toggle_light button *,
+.st-key-open_settings button *,
 .st-key-open_ai_from_nav button * {
   font-size:0 !important;
   line-height:0 !important;
@@ -579,9 +648,17 @@ button[data-testid^="stBaseButton"]:focus-visible {
   overflow:hidden !important;
   color:transparent !important;
 }
+.st-key-open_settings button::before {
+  -webkit-mask-size:22px 22px;
+  mask-size:22px 22px;
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' fill-rule='evenodd' clip-rule='evenodd' d='M9.95 2.54A.9.9 0 0 1 10.84 1.8h2.32a.9.9 0 0 1 .9.74l.32 1.9a6.9 6.9 0 0 1 1.62.94l1.8-.7a.9.9 0 0 1 1.11.4l1.16 2a.9.9 0 0 1-.2 1.15l-1.5 1.2a6.96 6.96 0 0 1 0 1.88l1.5 1.2a.9.9 0 0 1 .2 1.15l-1.16 2a.9.9 0 0 1-1.11.4l-1.8-.7a6.9 6.9 0 0 1-1.62.94l-.32 1.9a.9.9 0 0 1-.9.74h-2.32a.9.9 0 0 1-.9-.74l-.32-1.9a6.9 6.9 0 0 1-1.62-.94l-1.8.7a.9.9 0 0 1-1.11-.4l-1.16-2a.9.9 0 0 1 .2-1.15l1.5-1.2a6.96 6.96 0 0 1 0-1.88l-1.5-1.2a.9.9 0 0 1-.2-1.15l1.16-2a.9.9 0 0 1 1.11-.4l1.8.7a6.9 6.9 0 0 1 1.62-.94l.32-1.9ZM12 15a3 3 0 1 0 0-6a3 3 0 0 0 0 6Z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' fill-rule='evenodd' clip-rule='evenodd' d='M9.95 2.54A.9.9 0 0 1 10.84 1.8h2.32a.9.9 0 0 1 .9.74l.32 1.9a6.9 6.9 0 0 1 1.62.94l1.8-.7a.9.9 0 0 1 1.11.4l1.16 2a.9.9 0 0 1-.2 1.15l-1.5 1.2a6.96 6.96 0 0 1 0 1.88l1.5 1.2a.9.9 0 0 1 .2 1.15l-1.16 2a.9.9 0 0 1-1.11.4l-1.8-.7a6.9 6.9 0 0 1-1.62.94l-.32 1.9a.9.9 0 0 1-.9.74h-2.32a.9.9 0 0 1-.9-.74l-.32-1.9a6.9 6.9 0 0 1-1.62-.94l-1.8.7a.9.9 0 0 1-1.11-.4l-1.16-2a.9.9 0 0 1 .2-1.15l1.5-1.2a6.96 6.96 0 0 1 0-1.88l-1.5-1.2a.9.9 0 0 1-.2-1.15l1.16-2a.9.9 0 0 1 1.11-.4l1.8.7a6.9 6.9 0 0 1 1.62-.94l.32-1.9ZM12 15a3 3 0 1 0 0-6a3 3 0 0 0 0 6Z'/%3E%3C/svg%3E");
+}
 .st-key-theme_toggle_dark button::before {
-  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M21 14.8A8.8 8.8 0 0 1 9.2 3a7.2 7.2 0 1 0 11.8 11.8Z'/%3E%3C/svg%3E");
-  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M21 14.8A8.8 8.8 0 0 1 9.2 3a7.2 7.2 0 1 0 11.8 11.8Z'/%3E%3C/svg%3E");
+  -webkit-mask-size:23px 23px;
+  mask-size:23px 23px;
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2.4a9.6 9.6 0 1 0 9.6 9.6a1 1 0 0 0-1.66-.75a6.5 6.5 0 0 1-9.19-9.19A1 1 0 0 0 12 2.4Z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2.4a9.6 9.6 0 1 0 9.6 9.6a1 1 0 0 0-1.66-.75a6.5 6.5 0 0 1-9.19-9.19A1 1 0 0 0 12 2.4Z'/%3E%3C/svg%3E");
 }
 .st-key-theme_toggle_light button::before {
   -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10Zm0-5h1v3h-2V2h1Zm0 17h1v3h-2v-3h1ZM4.2 5.6l1.4-1.4l2.1 2.1l-1.4 1.4l-2.1-2.1Zm12.1 12.1l1.4-1.4l2.1 2.1l-1.4 1.4l-2.1-2.1ZM2 11h3v2H2v-2Zm17 0h3v2h-3v-2ZM5.6 19.8l-1.4-1.4l2.1-2.1l1.4 1.4l-2.1 2.1ZM17.7 7.7l-1.4-1.4l2.1-2.1l1.4 1.4l-2.1 2.1Z'/%3E%3C/svg%3E");
@@ -590,6 +667,43 @@ button[data-testid^="stBaseButton"]:focus-visible {
 .st-key-open_ai_from_nav button::before {
   -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E");
   mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E");
+}
+/* 顶栏右侧视觉重排：主题切换 → 搜索 → 添加，主题贴近搜索左侧（仅改 flex order，不动 DOM/窄屏规则） */
+.st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.st-key-theme_toggle_dark),
+.st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.st-key-theme_toggle_light) {
+  order:2;
+  flex:0 0 auto !important;
+  width:44px !important;
+  min-width:44px !important;
+  justify-content:center;
+}
+.st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.st-key-open_settings) {
+  order:1;
+  flex:0 0 auto !important;
+  width:44px !important;
+  min-width:44px !important;
+  justify-content:center;
+}
+/* 齿轮与主题两个图标之间收紧间距 */
+.st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.st-key-theme_toggle_dark),
+.st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.st-key-theme_toggle_light) {
+  margin-left:-6px;
+}
+.st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has([data-testid="stSelectbox"]) {
+  order:3;
+}
+.st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.st-key-search_add_ticker) {
+  order:4;
+}
+.t24-set-sec {
+  font-size:12px;
+  font-weight:750;
+  letter-spacing:.04em;
+  color:var(--t24-muted);
+  text-transform:uppercase;
+  margin:6px 0 10px;
+  padding-bottom:6px;
+  border-bottom:1px solid var(--t24-border);
 }
 @media (max-width: 900px) {
   .st-key-t24_topnav { padding:10px 16px; }
@@ -600,7 +714,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
   .st-key-t24_topnav [data-testid="stSelectbox"] input { font-size:13px !important; }
 }
 @media (max-width: 760px) {
-  .st-key-t24_topnav { margin-left:-10px; margin-right:-10px; }
+  .st-key-t24_topnav { margin-left:-10px; margin-right:-10px; width:calc(100% + 20px); max-width:none; }
   .st-key-t24_topnav [data-testid="stHorizontalBlock"] {
     display:flex !important;
     flex-flow:row wrap !important;
@@ -621,25 +735,28 @@ button[data-testid^="stBaseButton"]:focus-visible {
     order:2;
     flex:1 1 calc(33.333% - 8px) !important;
   }
-  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(6) {
+  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {
     display:none !important;
   }
-  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {
+  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(6) {
     order:3;
     flex:1 1 100% !important;
     width:100% !important;
+    display:flex !important;
   }
-  .st-key-t24_topnav [data-testid="stHorizontalBlock"]:has(.st-key-search_add_ticker) > [data-testid="stColumn"]:nth-child(5) {
+  .st-key-t24_topnav [data-testid="stHorizontalBlock"]:has(.st-key-search_add_ticker) > [data-testid="stColumn"]:nth-child(6) {
     flex:1 1 calc(100% - 88px) !important;
     width:auto !important;
   }
-  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(6):has(.st-key-search_add_ticker) {
+  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(7):has(.st-key-search_add_ticker) {
     display:flex !important;
     order:3;
     flex:0 0 80px !important;
     width:80px !important;
   }
-  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(7),
+  .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(7):not(:has(.st-key-search_add_ticker)) {
+    display:none !important;
+  }
   .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(8),
   .st-key-t24_topnav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(9) {
     order:1;
@@ -939,6 +1056,15 @@ button[data-testid^="stBaseButton"]:focus-visible {
   grid-template-columns:18px minmax(0, 1fr) auto;
   font-size:13px;
 }
+.t24-alert-link {
+  text-decoration:none !important;
+  color:var(--t24-text);
+  cursor:pointer;
+  border-radius:8px;
+  transition:background .12s ease;
+}
+.t24-alert-link:hover { background:var(--t24-surface-high); }
+.t24-alert-link strong { color:var(--t24-text); }
 .t24-stage-row:first-of-type,
 .t24-alert-row:first-of-type,
 .t24-decision-row:first-of-type,
@@ -1062,6 +1188,173 @@ button[data-testid^="stBaseButton"]:focus-visible {
   color:var(--t24-primary);
   box-shadow:0 0 0 3px color-mix(in srgb, var(--t24-primary) 12%, transparent);
 }
+.t24-stage-grid {
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:12px;
+}
+.t24-stage-chip {
+  border:1px solid var(--t24-border);
+  border-radius:999px;
+  padding:4px 11px;
+  font-size:12px;
+  font-weight:600;
+  color:var(--t24-subtle);
+  background:var(--t24-surface);
+  white-space:nowrap;
+}
+.t24-stage-chip.done {
+  border-color:color-mix(in srgb, var(--t24-primary) 38%, var(--t24-border));
+  color:var(--t24-primary);
+  background:color-mix(in srgb, var(--t24-primary) 9%, transparent);
+}
+.t24-stage-chip.active {
+  border-color:var(--t24-primary);
+  color:var(--t24-primary);
+  background:color-mix(in srgb, var(--t24-primary) 5%, transparent);
+  animation:t24pulse 1.6s ease-in-out infinite;
+}
+/* 今日分析面板 */
+.st-key-t24_today_panel {
+  background:var(--t24-surface);
+  border:1px solid var(--t24-border);
+  border-radius:12px;
+  padding:16px 18px;
+  margin:16px 0 4px;
+}
+.t24-today-row { display:flex; align-items:center; gap:10px; padding:6px 0; }
+.t24-today-name { font-weight:650; color:var(--t24-text); }
+.t24-today-badge {
+  margin-left:auto;
+  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
+  font-size:11px; padding:2px 10px; border-radius:999px;
+  border:1px solid var(--t24-border); color:var(--t24-subtle);
+}
+.t24-today-badge.done {
+  color:var(--t24-primary);
+  border-color:color-mix(in srgb, var(--t24-primary) 38%, var(--t24-border));
+  background:color-mix(in srgb, var(--t24-primary) 9%, transparent);
+}
+.t24-today-badge.running { color:var(--t24-primary); border-color:var(--t24-primary); }
+.t24-today-badge.failed {
+  color:var(--t24-danger);
+  border-color:color-mix(in srgb, var(--t24-danger) 40%, var(--t24-border));
+}
+/* 每行的运行状态图标按钮（随状态变形） */
+[class*="st-key-runstate-"] button {
+  width:34px !important; min-width:34px !important;
+  height:34px !important; min-height:34px !important;
+  padding:0 !important; border-radius:9px !important;
+  border:1px solid var(--t24-border) !important;
+  background:var(--t24-surface) !important;
+  box-shadow:none !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
+  color:var(--t24-primary) !important; font-size:0 !important;
+}
+[class*="st-key-runstate-"] button:disabled { opacity:1 !important; cursor:default !important; }
+[class*="st-key-runstate-"] button * {
+  font-size:0 !important; width:0 !important; height:0 !important;
+  overflow:hidden !important; color:transparent !important;
+}
+[class*="st-key-runstate-"] button::before {
+  content:""; display:block; width:17px; height:17px; background:currentColor;
+  -webkit-mask-repeat:no-repeat; -webkit-mask-position:center; -webkit-mask-size:17px 17px;
+  mask-repeat:no-repeat; mask-position:center; mask-size:17px 17px;
+}
+[class*="st-key-runstate-idle-"] button::before {
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8 5v14l11-7z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8 5v14l11-7z'/%3E%3C/svg%3E");
+}
+[class*="st-key-runstate-done-"] button {
+  color:var(--t24-primary) !important;
+  border-color:color-mix(in srgb, var(--t24-primary) 38%, var(--t24-border)) !important;
+  background:color-mix(in srgb, var(--t24-primary) 9%, transparent) !important;
+}
+[class*="st-key-runstate-done-"] button::before {
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'/%3E%3C/svg%3E");
+}
+[class*="st-key-runstate-running-"] button::before,
+[class*="st-key-runstate-failed-"] button::before {
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z'/%3E%3C/svg%3E");
+}
+[class*="st-key-runstate-running-"] button {
+  color:var(--t24-primary) !important; border-color:var(--t24-primary) !important;
+}
+[class*="st-key-runstate-running-"] button::before { animation:t24spin 1.1s linear infinite; }
+[class*="st-key-runstate-queued-"] button { color:var(--t24-muted) !important; }
+[class*="st-key-runstate-queued-"] button::before {
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20zm1 5h-2v6l5 3l1-1.7l-4-2.4z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20zm1 5h-2v6l5 3l1-1.7l-4-2.4z'/%3E%3C/svg%3E");
+}
+[class*="st-key-runstate-failed-"] button {
+  color:var(--t24-danger) !important;
+  border-color:color-mix(in srgb, var(--t24-danger) 40%, var(--t24-border)) !important;
+}
+@keyframes t24spin { to { transform:rotate(360deg); } }
+/* 关注页统一列表 */
+.t24-wl-summary { font-size:14px; color:var(--t24-text); }
+.t24-wl-summary b { color:var(--t24-primary); font-weight:750; }
+.st-key-t24_watchlist {
+  border:0.5px solid var(--t24-border);
+  border-radius:12px;
+  background:var(--t24-surface);
+  padding:12px 20px;
+  margin-top:12px;
+}
+.st-key-t24_watchlist [data-testid="stMarkdownContainer"]:has(.t24-wl-row) {
+  transform:translateY(-8px);
+}
+.t24-wl-row {
+  display:grid;
+  grid-template-columns:120px 96px minmax(0,1fr) auto;
+  align-items:center;
+  gap:16px;
+  min-width:0;
+}
+.t24-wl-name { font-weight:650; color:var(--t24-text); text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.t24-wl-code { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace !important; font-size:12px; color:var(--t24-muted); text-align:left; white-space:nowrap; }
+.t24-wl-th { font-size:12px; color:var(--t24-muted); text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.t24-wl-row .t24-today-badge { justify-self:end; }
+[class*="st-key-wl_drawer_"] {
+  background:var(--t24-surface-high);
+  border:0.5px solid var(--t24-border);
+  border-radius:10px;
+  padding:12px 14px;
+  margin:2px 0 10px;
+}
+[class*="st-key-wledit-"] button,
+[class*="st-key-wldel-"] button {
+  width:34px !important; min-width:34px !important;
+  height:34px !important; min-height:34px !important;
+  padding:0 !important; border-radius:9px !important;
+  border:1px solid var(--t24-border) !important;
+  background:var(--t24-surface) !important; box-shadow:none !important;
+  display:flex !important; align-items:center !important; justify-content:center !important;
+  color:var(--t24-muted) !important; font-size:0 !important;
+}
+[class*="st-key-wldel-"] button { color:var(--t24-danger) !important; }
+[class*="st-key-wledit-"] button *,
+[class*="st-key-wldel-"] button * {
+  font-size:0 !important; width:0 !important; height:0 !important;
+  overflow:hidden !important; color:transparent !important;
+}
+[class*="st-key-wledit-"] button::before,
+[class*="st-key-wldel-"] button::before {
+  content:""; display:block; width:16px; height:16px; background:currentColor;
+  -webkit-mask-repeat:no-repeat; -webkit-mask-position:center; -webkit-mask-size:16px 16px;
+  mask-repeat:no-repeat; mask-position:center; mask-size:16px 16px;
+}
+[class*="st-key-wledit-"] button::before {
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83l3.75 3.75l1.83-1.83z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83l3.75 3.75l1.83-1.83z'/%3E%3C/svg%3E");
+}
+[class*="st-key-wldel-"] button::before {
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z'/%3E%3C/svg%3E");
+}
 .t24-section-anchor,
 .t24-report-anchor {
   scroll-margin-top:132px;
@@ -1093,7 +1386,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
   font-size:34px;
   line-height:1;
   font-weight:800;
-  color:var(--t24-primary);
+  color:var(--t24-text);
   white-space:nowrap;
 }
 .stTabs [data-baseweb="tab-highlight"] { background-color:var(--t24-primary) !important; }
@@ -1482,7 +1775,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
   .t24-pipeline {
     position:fixed;
     top:164px;
-    left:max(22px, calc((100vw - 1260px) / 2 + 22px));
+    left:max(22px, calc(var(--t24-gutter) + 22px));
     width:clamp(138px, 19vw, 185px);
     max-height:calc(100vh - 190px);
     overflow:auto;
@@ -1622,7 +1915,17 @@ button[data-testid^="stBaseButton"]:focus-visible {
             background:color-mix(in srgb, currentColor 12%, transparent) !important;
             border:none !important; box-shadow:none !important;
         }
-        .st-key-ai_new_chat button *, .st-key-ai_scope_toggle button * { display:none !important; }
+        .st-key-ai_new_chat button *, .st-key-ai_scope_toggle button * {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
         .st-key-ai_new_chat button::before, .st-key-ai_scope_toggle button::before {
             content:""; display:block; width:17px; height:17px; background:currentColor;
             -webkit-mask-repeat:no-repeat; -webkit-mask-position:center; -webkit-mask-size:17px;
@@ -1886,10 +2189,23 @@ symbols = [t.symbol for t in watch]
 names = {t.symbol: t.name for t in watch}
 latest = {s: (db.get_runs(conn, ticker=s, limit=1) or [None])[0] for s in symbols}
 
-if "detail" not in st.session_state:
-    st.session_state.detail = None
-if "view" not in st.session_state:
-    st.session_state.view = "总览"
+# 路由从 URL query params 水合：自动刷新走整页 reload 会清空 session_state，
+# 靠 ?p=/&t= 把当前页面恢复回来，避免运行中“闪回总览”。
+if "view" not in st.session_state or "detail" not in st.session_state:
+    _qp = st.query_params
+    _p = _qp.get("p", "overview")
+    _t = _qp.get("t")
+    if _p == "analysis":
+        st.session_state.view = "分析"
+        st.session_state.detail = _t if (_t and _t in symbols) else (symbols[0] if symbols else None)
+        if st.session_state.detail:
+            st.session_state.last_detail = st.session_state.detail
+    elif _p == "watchlist":
+        st.session_state.view = "管理关注列表"
+        st.session_state.detail = None
+    else:
+        st.session_state.view = "总览"
+        st.session_state.detail = None
 if "editing_symbol" not in st.session_state:
     st.session_state.editing_symbol = None
 if "pending_delete" not in st.session_state:
@@ -1984,14 +2300,14 @@ def confirm_analysis_delete_dialog() -> None:
 
 
 def conclusion(run_id) -> str:
-    """从最终决策段抽一句话结论。"""
+    """从最终决策段抽执行摘要（完整一段，不截断）。"""
     reps = {r.section: r.content for r in db.get_reports(conn, run_id)}
     txt = reps.get("final") or reps.get("trader") or ""
-    m = re.search(r"Executive Summary\**[:：]\s*(.+)", txt)
-    if m:
-        sent = re.split(r"(?<=[.。!?])\s", m.group(1).strip())[0]
-        return sent[:140]
-    return (txt.strip().replace("\n", " "))[:140] or "（无摘要）"
+    # 优先取「Executive Summary」标记后的完整一段（到下一个空行为止）
+    m = re.search(r"Executive Summary\**[:：]\s*(.+?)(?:\n\s*\n|\Z)", txt, re.S)
+    body = m.group(1) if m else re.split(r"\n\s*\n", txt.strip(), 1)[0]
+    body = re.sub(r"\s+", " ", body.strip().lstrip("#*> ").strip())
+    return body or "（无摘要）"
 
 
 def full_run_label(run) -> str:
@@ -2082,6 +2398,19 @@ def ask_ai(prompt: str, context_text: str, history: list | None = None) -> tuple
         return False, f"AI 请求失败：{type(exc).__name__}。请检查模型密钥、网络和 settings.yaml 的模型配置。"
 
 
+def resolve_ticker_name(symbol: str) -> str:
+    """加标的时自动取默认名：用 yfinance 英文名兜底，取不到就用代码；中文名由用户自行编辑。"""
+    try:
+        import yfinance as yf
+        info = yf.Ticker(symbol).info or {}
+        en = (info.get("shortName") or info.get("longName") or "").strip()
+        if en:
+            return en
+    except Exception:  # noqa: BLE001
+        pass
+    return symbol
+
+
 def report_sections(run_id):
     reps = db.get_reports(conn, run_id)
     order = ["market", "sentiment", "news", "fundamentals", "bull", "bear",
@@ -2114,14 +2443,31 @@ def kpi_card(slot, label: str, value: str, delta: str | None = None) -> None:
     )
 
 
+def _write_route_query() -> None:
+    """把当前路由写进 URL query params，让整页刷新/直接访问能恢复到同一页面。"""
+    if st.session_state.detail:
+        st.query_params["p"] = "analysis"
+        st.query_params["t"] = st.session_state.detail
+    else:
+        st.query_params["p"] = "watchlist" if st.session_state.view == "管理关注列表" else "overview"
+        if "t" in st.query_params:
+            del st.query_params["t"]
+
+
 def goto_dashboard() -> None:
     st.session_state.view = "总览"
     st.session_state.detail = None
+    _write_route_query()
 
 
 def goto_analysis(sym: str | None = None) -> None:
     st.session_state.view = "分析"
-    st.session_state.detail = sym or (symbols[0] if symbols else None)
+    # 无指定标的时，默认打开上一次查看的标的，否则退回第一个
+    target = sym or st.session_state.get("last_detail") or (symbols[0] if symbols else None)
+    st.session_state.detail = target
+    if target:
+        st.session_state.last_detail = target
+    _write_route_query()
 
 
 def goto_history() -> None:
@@ -2131,6 +2477,7 @@ def goto_history() -> None:
 def goto_watchlist() -> None:
     st.session_state.view = "管理关注列表"
     st.session_state.detail = None
+    _write_route_query()
 
 
 def route_key() -> str:
@@ -2178,6 +2525,14 @@ def delta_display(sym: str) -> str:
     return f"{sign}{pct:.2f}%"
 
 
+def delta_color(sym: str) -> str:
+    """日涨跌颜色随涨跌方向：涨=绿、跌=红、无数据=灰（与决策色相互独立）。"""
+    diff, _ = price_delta(sym)
+    if diff is None:
+        return "var(--t24-muted)"
+    return "var(--t24-primary)" if diff >= 0 else "var(--t24-danger)"
+
+
 def decision_accent(decision: str | None) -> str:
     d = _norm_decision(decision)
     if d == "BUY":
@@ -2209,6 +2564,38 @@ def run_age(run) -> str:
     if hours < 48:
         return f"{hours}h ago"
     return f"{hours // 24}d ago"
+
+
+def run_timestamp(run):
+    """返回运行的完成/开始时间（aware datetime，naive 视为 UTC），无则 None。"""
+    if not run:
+        return None
+    raw = run.finished_at or run.started_at
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def run_is_today(run) -> bool:
+    """运行是否发生在本地日历意义上的“今天”。"""
+    dt = run_timestamp(run)
+    if not dt:
+        return False
+    return dt.astimezone().date() == datetime.now().astimezone().date()
+
+
+def run_within_hours(run, hours: float) -> bool:
+    """运行是否落在最近 hours 小时内。"""
+    dt = run_timestamp(run)
+    if not dt:
+        return False
+    return (datetime.now(dt.tzinfo) - dt).total_seconds() <= hours * 3600
 
 
 def token_cost_text(run) -> str:
@@ -2292,66 +2679,330 @@ def start_background_analysis(symbol: str) -> None:
     thread.start()
 
 
-def render_auto_refresh(active: bool) -> None:
-    if not active:
+BATCH_MAX_CONCURRENCY = 3
+
+
+def _batch_analysis_worker(syms: list[str], trade_date: str) -> None:
+    """后台批量：最多 3 个并发（<3 全并行，>3 按 3 个一组），失败隔离。"""
+    with ThreadPoolExecutor(max_workers=BATCH_MAX_CONCURRENCY) as ex:
+        list(ex.map(lambda s: analysis_worker(s, trade_date), syms))
+
+
+def start_batch_analysis(syms: list[str]) -> None:
+    """标记排队并起一个协调线程按 3 并发跑给定标的（跳过已在跑的）。"""
+    pending = st.session_state.pending_analysis_symbols
+    targets = [s for s in syms if s not in pending]
+    if not targets:
         return
-    components.html(
-        """
-        <script>
-        window.setTimeout(() => window.parent.location.reload(), 5000);
-        </script>
-        """,
-        height=0,
+    for s in targets:
+        pending[s] = datetime.now(timezone.utc).isoformat()
+    threading.Thread(
+        target=_batch_analysis_worker,
+        args=(targets, date.today().isoformat()),
+        daemon=True,
+    ).start()
+
+
+def today_run_state(sym: str) -> str:
+    """某标的今天的运行态：running / done / failed / queued / idle。"""
+    r = (db.get_runs(conn, ticker=sym, limit=1) or [None])[0]
+    if r and r.status == "running":
+        return "running"
+    if r and run_is_today(r):
+        if r.status == "success":
+            return "done"
+        if r.status == "failed":
+            return "failed"
+    if sym in st.session_state.pending_analysis_symbols:
+        return "queued"
+    return "idle"
+
+
+PIPELINE_STAGES = [
+    ("market", "技术面"), ("sentiment", "情绪面"), ("news", "消息面"),
+    ("fundamentals", "基本面"), ("bull", "多方"), ("bear", "空方"),
+    ("research_mgr", "研究经理"), ("trader", "交易员"), ("risk", "风险复核"),
+    ("final", "最终决策"),
+]
+
+
+def _pipeline_progress_html(run_id: int | None) -> str:
+    """按数据库里已落库的报告段，渲染实时阶段清单（✓ 已完成 / ⟳ 进行中 / · 待运行）。"""
+    done = set()
+    if run_id:
+        done = {r.section for r in db.get_reports(conn, run_id)}
+    chips = []
+    current_marked = False
+    for key, label in PIPELINE_STAGES:
+        if key in done:
+            cls, mark = "done", "✓"
+        elif not current_marked:
+            cls, mark = "active", "⟳"
+            current_marked = True
+        else:
+            cls, mark = "", "·"
+        chips.append(f"<div class='t24-stage-chip {cls}'>{mark} {html_safe(label)}</div>")
+    n = len(done & {k for k, _ in PIPELINE_STAGES})
+    return (
+        f"<div class='t24-stage-grid'>{''.join(chips)}</div>"
+        f"<div class='t24-live-run-sub' style='margin-top:8px;'>已完成 {n} / {len(PIPELINE_STAGES)} 段</div>"
     )
 
 
-def render_live_analysis_status(sym: str, run: Run | None) -> None:
+def _render_live_status_card(sym: str, run: Run | None) -> str | None:
+    """渲染运行状态卡，返回当前 status（pending/running/success/failed/None）。"""
     pending = sym in st.session_state.pending_analysis_symbols
     status = run.status if run else ("pending" if pending else None)
     if status not in {"pending", "running", "success", "failed"}:
-        return
+        return status
     if status == "pending":
         title = f"{sym} 正在创建分析任务"
         sub = "已完成价格数据校验，正在启动单只股票分析。"
         step_classes = ["done", "active", "", ""]
-        refresh = True
     elif status == "running":
         title = f"{sym} Agent Pipeline 正在运行"
-        sub = "页面会自动刷新；完成后会展示决策历史和完整报告。"
+        sub = "运行中，各环节完成即刻显示，无需等到全部跑完。"
         step_classes = ["done", "done", "active", ""]
-        refresh = True
     elif status == "success":
         title = f"{sym} 分析完成"
         sub = "最新决策和报告已写入，可以继续查看下方模块。"
         step_classes = ["done", "done", "done", "done"]
-        refresh = False
     else:
         title = f"{sym} 分析失败"
         sub = html_safe(run.error if run and run.error else "运行失败，请检查 API Key、数据源或限流状态。")
         step_classes = ["done", "done", "active", ""]
-        refresh = False
     steps = ("数据源", "创建任务", "Agent Pipeline", "写入报告")
     step_html = "".join(
         f"<div class='t24-live-step {css}'>{html_safe(label)}</div>"
         for label, css in zip(steps, step_classes)
     )
+    progress_html = ""
+    if status in {"pending", "running"}:
+        progress_html = _pipeline_progress_html(run.id if run else None)
     st.markdown(
         f"<div class='t24-live-run'>"
         f"<div class='t24-live-run-head'><span>{html_safe(title)}</span>"
         f"<span class='t24-data'>{html_safe(status_label(status))}</span></div>"
         f"<div class='t24-live-run-sub'>{sub}</div>"
         f"<div class='t24-live-run-steps'>{step_html}</div>"
+        f"{progress_html}"
         f"</div>",
         unsafe_allow_html=True,
     )
+    return status
+
+
+@st.fragment(run_every=3)
+def _live_analysis_fragment(sym: str) -> None:
+    """运行中每 3 秒只局部重跑这块（不整页刷新、不闪）；完成后整页 rerun 出完整报告。"""
+    run = (db.get_runs(conn, ticker=sym, limit=1) or [None])[0]
+    status = _render_live_status_card(sym, run)
     if status in {"success", "failed"}:
         st.session_state.pending_analysis_symbols.pop(sym, None)
-    render_auto_refresh(refresh)
+        st.rerun()  # 跳出轮询，触发整页 rerun 渲染决策历史和报告
+
+
+def render_live_analysis_status(sym: str, run: Run | None) -> None:
+    pending = sym in st.session_state.pending_analysis_symbols
+    status = run.status if run else ("pending" if pending else None)
+    if status in {"pending", "running"}:
+        _live_analysis_fragment(sym)
+    elif status in {"success", "failed"}:
+        st.session_state.pending_analysis_symbols.pop(sym, None)
+        _render_live_status_card(sym, run)
+
+
+LLM_PROVIDERS = [
+    ("OpenAI", "openai", "https://api.openai.com/v1"),
+    ("Google", "google", None),
+    ("Anthropic", "anthropic", "https://api.anthropic.com/"),
+    ("xAI", "xai", "https://api.x.ai/v1"),
+    ("DeepSeek", "deepseek", "https://api.deepseek.com"),
+    ("Qwen", "qwen", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),
+    ("GLM", "glm", "https://open.bigmodel.cn/api/paas/v4/"),
+    ("MiniMax", "minimax", "https://api.minimax.io/v1"),
+    ("OpenRouter", "openrouter", "https://openrouter.ai/api/v1"),
+    ("Mistral", "mistral", "https://api.mistral.ai/v1"),
+    ("Kimi (Moonshot)", "kimi", "https://api.moonshot.ai/v1"),
+    ("Groq", "groq", "https://api.groq.com/openai/v1"),
+    ("NVIDIA NIM", "nvidia", "https://integrate.api.nvidia.com/v1"),
+    ("Azure OpenAI", "azure", None),
+    ("Amazon Bedrock", "bedrock", None),
+    ("Ollama", "ollama", "http://localhost:11434/v1"),
+    ("OpenAI-compatible", "openai_compatible", None),
+]
+PROVIDER_KEYS = [k for _, k, _ in LLM_PROVIDERS]
+PROVIDER_LABEL = {k: d for d, k, _ in LLM_PROVIDERS}
+PROVIDER_DEFAULT_URL = {k: u for _, k, u in LLM_PROVIDERS}
+ANALYST_OPTIONS = [
+    ("market", "市场 / 技术面"),
+    ("social", "情绪面"),
+    ("news", "新闻面"),
+    ("fundamentals", "基本面"),
+]
+ANALYST_LABEL = {k: v for k, v in ANALYST_OPTIONS}
+DEPTH_OPTIONS = [("浅 · 快速（1 轮辩论）", 1), ("中 · 均衡（3 轮）", 3), ("深 · 充分（5 轮）", 5)]
+LANGUAGE_OPTIONS = [
+    ("Chinese", "中文"), ("English", "English"), ("Japanese", "日本語"),
+    ("Korean", "한국어"), ("Spanish", "Español"), ("Portuguese", "Português"),
+    ("French", "Français"), ("German", "Deutsch"), ("Russian", "Русский"),
+    ("Arabic", "العربية"), ("Hindi", "हिन्दी"),
+]
+VENDOR_FIELDS = [
+    ("core_stock_apis", "行情"),
+    ("technical_indicators", "技术指标"),
+    ("fundamental_data", "基本面数据"),
+    ("news_data", "新闻数据"),
+]
+PROVIDER_KEY_ENV = {
+    "openai": "OPENAI_API_KEY", "deepseek": "DEEPSEEK_API_KEY", "anthropic": "ANTHROPIC_API_KEY",
+    "google": "GOOGLE_API_KEY", "xai": "XAI_API_KEY", "qwen": "DASHSCOPE_API_KEY",
+    "glm": "GLM_API_KEY", "minimax": "MINIMAX_API_KEY", "openrouter": "OPENROUTER_API_KEY",
+    "mistral": "MISTRAL_API_KEY", "kimi": "MOONSHOT_API_KEY", "groq": "GROQ_API_KEY",
+    "nvidia": "NVIDIA_API_KEY", "azure": "AZURE_OPENAI_API_KEY", "bedrock": "AWS_ACCESS_KEY_ID",
+}
+
+
+def _model_choices(provider: str, mode: str, current: str | None) -> list[str]:
+    """按供应商+模式取模型目录；current 不在列表里则置顶。openrouter/异常时回退空表。"""
+    opts: list[str] = []
+    try:
+        from tradingagents.llm_clients.model_catalog import get_model_options
+        opts = [v for _, v in get_model_options(provider, mode) if v and v != "custom"]
+    except Exception:
+        opts = []
+    if current and current not in opts:
+        opts = [current] + opts
+    return opts
+
+
+@st.dialog("设置", width="large")
+def render_settings_dialog() -> None:
+    s = load_settings()
+    st.markdown("<div class='t24-set-sec'>分析引擎（通用配置）</div>", unsafe_allow_html=True)
+
+    prov_idx = PROVIDER_KEYS.index(s.llm_provider) if s.llm_provider in PROVIDER_KEYS else 4
+    provider = st.selectbox(
+        "LLM 供应商", PROVIDER_KEYS, index=prov_idx,
+        format_func=lambda k: PROVIDER_LABEL.get(k, k), key="set_provider",
+    )
+
+    mc = st.columns(2)
+    with mc[0]:
+        deep = _model_field("深思考模型", provider, "deep", s.deep_think_llm, "deep")
+    with mc[1]:
+        quick = _model_field("快思考模型", provider, "quick", s.quick_think_llm, "quick")
+
+    default_url = PROVIDER_DEFAULT_URL.get(provider) or ""
+    url_seed = s.backend_url if provider == s.llm_provider else default_url
+    backend_url = st.text_input(
+        "接口地址 backend_url", value=url_seed or "",
+        key=f"set_url_{provider}", placeholder=default_url or "该供应商无需自定义地址",
+    ) or None
+
+    dc = st.columns(2)
+    with dc[0]:
+        depth_vals = [v for _, v in DEPTH_OPTIONS]
+        depth_idx = depth_vals.index(s.max_debate_rounds) if s.max_debate_rounds in depth_vals else 0
+        depth = st.radio(
+            "研究深度", DEPTH_OPTIONS, index=depth_idx,
+            format_func=lambda o: o[0], key="set_depth",
+        )[1]
+    with dc[1]:
+        lang_keys = [k for k, _ in LANGUAGE_OPTIONS]
+        lang_idx = lang_keys.index(s.output_language) if s.output_language in lang_keys else 1
+        output_language = st.selectbox(
+            "报告输出语言", lang_keys, index=lang_idx,
+            format_func=lambda k: dict(LANGUAGE_OPTIONS).get(k, k), key="set_lang",
+        )
+
+    analysts = st.multiselect(
+        "分析师团队", [k for k, _ in ANALYST_OPTIONS],
+        default=[a for a in s.analysts if a in ANALYST_LABEL] or [k for k, _ in ANALYST_OPTIONS],
+        format_func=lambda k: ANALYST_LABEL.get(k, k), key="set_analysts",
+    )
+
+    with st.expander("数据源（高级）"):
+        vendors = {}
+        for vk, vlabel in VENDOR_FIELDS:
+            vendors[vk] = st.text_input(
+                vlabel, value=(s.data_vendors or {}).get(vk, "yfinance"), key=f"set_vendor_{vk}",
+            )
+
+    env_var = PROVIDER_KEY_ENV.get(provider)
+    key_ok = bool(env_var and os.getenv(env_var))
+    st.caption(
+        (f"🔑 {env_var}：{'已配置 ✅' if key_ok else '未检测到 ⚠️ 请在 .env 配置'}"
+         if env_var else "🔑 该供应商的密钥请在 .env 配置")
+    )
+
+    st.markdown("<div class='t24-set-sec'>网站设置</div>", unsafe_allow_html=True)
+    wc = st.columns(2)
+    with wc[0]:
+        new_run_time = st.text_input("每日运行时间 (HH:MM)", value=run_time, key="set_run_time")
+        cost_budget = st.number_input(
+            "每日成本预算 (USD)", min_value=0.0, value=float(s.cost_budget_usd_per_day),
+            step=1.0, key="set_budget",
+        )
+    with wc[1]:
+        price_in = st.number_input(
+            "输入单价 ($/1M tok)", min_value=0.0, value=float(s.price_per_1m_input),
+            step=0.01, format="%.2f", key="set_price_in",
+        )
+        price_out = st.number_input(
+            "输出单价 ($/1M tok)", min_value=0.0, value=float(s.price_per_1m_output),
+            step=0.01, format="%.2f", key="set_price_out",
+        )
+
+    notify = dict(s.notify or {})
+    notify_enabled = st.toggle("启用通知（Telegram）", value=bool(notify.get("enabled")), key="set_notify_en")
+    nc = st.columns(2)
+    with nc[0]:
+        notify_channel = st.text_input("通知渠道", value=notify.get("channel", "telegram"), key="set_notify_ch")
+    with nc[1]:
+        notify_target = st.text_input("通知目标", value=notify.get("target", ""), key="set_notify_tg")
+
+    st.divider()
+    bc = st.columns([1, 1])
+    if bc[0].button("保存", type="primary", width="stretch", key="set_save"):
+        new = Settings(
+            llm_provider=provider,
+            deep_think_llm=deep.strip() or s.deep_think_llm,
+            quick_think_llm=quick.strip() or s.quick_think_llm,
+            backend_url=backend_url,
+            max_debate_rounds=depth,
+            max_risk_discuss_rounds=depth,
+            output_language=output_language,
+            data_vendors={k: v.strip() for k, v in vendors.items() if v.strip()},
+            cost_budget_usd_per_day=cost_budget,
+            price_per_1m_input=price_in,
+            price_per_1m_output=price_out,
+            notify={"enabled": notify_enabled, "channel": notify_channel, "target": notify_target},
+            analysts=analysts or ["market", "social", "news", "fundamentals"],
+        )
+        save_settings(new)
+        if new_run_time.strip() and new_run_time.strip() != run_time:
+            save_watchlist(new_run_time.strip(), watch)
+        st.toast("设置已保存，下次分析生效")
+        st.rerun()
+    if bc[1].button("取消", width="stretch", key="set_cancel"):
+        st.rerun()
+
+
+def _model_field(label: str, provider: str, mode: str, current: str | None, slot: str) -> str:
+    """模型选择：优先目录下拉，勾选“自定义”改为手填。"""
+    choices = _model_choices(provider, mode, current)
+    custom = st.checkbox("自定义", key=f"set_model_custom_{slot}_{provider}",
+                         value=not choices)
+    if custom or not choices:
+        return st.text_input(label, value=current or "", key=f"set_model_txt_{slot}_{provider}")
+    idx = choices.index(current) if current in choices else 0
+    return st.selectbox(label, choices, index=idx, key=f"set_model_sel_{slot}_{provider}")
 
 
 def render_market_tape() -> None:
     tape_items = []
-    for sym in symbols[:4]:
+    for sym in symbols:  # 全部标的滚动展示，新增标的自动同步
         tape_items.append(
             f"{html_safe(sym)}: {html_safe(price_display(sym))} "
             f"({html_safe(delta_display(sym))})"
@@ -2359,15 +3010,21 @@ def render_market_tape() -> None:
     if not tape_items:
         tape_items.append("No watchlist symbols")
     tape_items.append(f"Scheduler: Next run {html_safe(run_time)}")
-    st.markdown(f"<div class='t24-tape'>{' &nbsp; | &nbsp; '.join(tape_items)}</div>",
-                unsafe_allow_html=True)
+    sep = " &nbsp; | &nbsp; "
+    seq = sep.join(tape_items) + sep
+    # 轨道内容复制两份 + translateX(-50%) 实现无缝循环滚动
+    seg = f"<span class='t24-tape-seg'>{seq}</span>"
+    st.markdown(
+        f"<div class='t24-tape'><div class='t24-tape-track'>{seg}"
+        f"<span class='t24-tape-seg' aria-hidden='true'>{seq}</span></div></div>",
+        unsafe_allow_html=True)
 
 
 def render_top_nav() -> None:
     active = route_key()
     with st.container(key="t24_topnav"):
         nav_cols = st.columns(
-            [1.3, .5, .5, .5, 1.95, 1.3, .5, .5],
+            [1.3, .5, .5, .5, 1.95, 1.3, .5, .5, .5],
             gap="small",
             vertical_alignment="center",
         )
@@ -2388,7 +3045,7 @@ def render_top_nav() -> None:
             symbols,
             index=None,
             format_func=search_option_label,
-            placeholder="Search ticker...",
+            placeholder="搜索代码…",
             label_visibility="collapsed",
             key=f"global_ticker_search_{st.session_state.search_nonce}",
             accept_new_options=True,
@@ -2416,7 +3073,7 @@ def render_top_nav() -> None:
                 rt, current_watch = load_watchlist()
                 current_symbols = [t.symbol for t in current_watch]
                 if candidate not in current_symbols:
-                    current_watch.append(TickerCfg(symbol=candidate, name=candidate))
+                    current_watch.append(TickerCfg(symbol=candidate, name=resolve_ticker_name(candidate)))
                     save_watchlist(rt, current_watch)
                 start_background_analysis(candidate)
                 st.session_state.search_nonce += 1
@@ -2430,6 +3087,8 @@ def render_top_nav() -> None:
         if nav_cols[7].button("切换主题", key=theme_key, width="stretch", help="切换深浅主题"):
             st.session_state.theme_mode = next_theme
             st.rerun()
+        if nav_cols[8].button("设置", key="open_settings", width="stretch"):
+            render_settings_dialog()
 
 
 def render_pipeline_scrollspy() -> None:
@@ -2581,7 +3240,7 @@ def detail_view(sym):
             f"<span class='t24-ticker-code'>{html_safe(market_label(sym))}</span></div>"
             f"<div class='t24-muted'>{html_safe(sym)}</div></div>"
             f"<div><div class='t24-hero-price'>{html_safe(price_display(sym))}</div>"
-            f"<div class='t24-data' style='color:var(--t24-primary);'>{html_safe(price_delta_text)}</div></div>"
+            f"<div class='t24-data' style='color:{delta_color(sym)};'>{html_safe(price_delta_text)}</div></div>"
             f"<div style='text-align:right;'><div class='caps'>决策状态</div>"
             f"{badge(r.decision if r else None, big=True)}"
             f"<div class='t24-data' style='font-size:12px;color:var(--t24-muted);margin-top:8px;'>"
@@ -2605,7 +3264,7 @@ def detail_view(sym):
                         int(item.id) for item in shown_rows
                         if item.id is not None and st.session_state.get(f"analysis_pick_{sym}_{item.id}", False)
                     ]
-                    mode_cols = st.columns([1, 0.16, 0.16], vertical_alignment="center")
+                    mode_cols = st.columns([1, 0.16, 0.18, 0.16], vertical_alignment="center")
                     if mode_cols[1].button("取消", width="stretch", key=f"analysis_cancel_delete_{sym}"):
                         st.session_state.analysis_delete_mode = False
                         st.session_state.analysis_delete_pending_ids = []
@@ -2613,7 +3272,16 @@ def detail_view(sym):
                             if str(key).startswith("analysis_pick_"):
                                 st.session_state[key] = False
                         st.rerun()
-                    if mode_cols[2].button("删除", disabled=not selected_delete_ids, width="stretch",
+                    if mode_cols[2].button("发给 AI", disabled=not selected_delete_ids, width="stretch",
+                                            key=f"analysis_send_ai_{sym}"):
+                        st.session_state.ai_selected_run_ids = selected_delete_ids
+                        st.session_state.ai_panel_open = True
+                        st.session_state.analysis_delete_mode = False
+                        for key in list(st.session_state.keys()):
+                            if str(key).startswith("analysis_pick_"):
+                                st.session_state[key] = False
+                        st.rerun()
+                    if mode_cols[3].button("删除", disabled=not selected_delete_ids, width="stretch",
                                             key=f"analysis_delete_button_{sym}"):
                         st.session_state.analysis_delete_pending_ids = selected_delete_ids
                         confirm_analysis_delete_dialog()
@@ -2694,127 +3362,134 @@ def detail_view(sym):
     render_pipeline_scrollspy()
 
 
+def _sparkline_svg(sym: str, w: int = 300, h: int = 30) -> str:
+    """近 120 日收盘价：中性灰走势线 + 决策 ▲▼● 标记（形状/颜色随决策）。"""
+    rows = db.get_prices(conn, sym, limit=120)
+    data = [(x.get("date"), float(x["close"])) for x in rows
+            if x.get("close") is not None and x.get("date")]
+    if len(data) < 2:
+        return f"<svg class='t24-ov-spark' viewBox='0 0 {w} {h}' preserveAspectRatio='none'></svg>"
+    closes = [c for _, c in data]
+    lo, hi = min(closes), max(closes)
+    span = (hi - lo) or 1.0
+    pad, n = 5, len(data)
+
+    def _xy(i, c):
+        return i / (n - 1) * w, pad + (1 - (c - lo) / span) * (h - 2 * pad)
+
+    poly = " ".join(f"{x:.1f},{y:.1f}" for i, (_, c) in enumerate(data) for x, y in [_xy(i, c)])
+    line = (f"<polyline points='{poly}' fill='none' stroke='var(--t24-subtle)' "
+            f"stroke-width='1.4' vector-effect='non-scaling-stroke'/>")
+    # 决策标记落在对应日期的收盘点上；sx 略窄以抵消横向拉伸
+    idx = {d: i for i, (d, _) in enumerate(data)}
+    marks = ""
+    colors = {"BUY": "var(--t24-primary)", "SELL": "var(--t24-danger)", "HOLD": "var(--t24-muted)"}
+    sx, sy = 2.8, 3.8
+    for dec, pts in charts_mod._decision_points(rows, db.get_runs(conn, ticker=sym, limit=200)).items():
+        col = colors.get(dec, "var(--t24-muted)")
+        for pdate, pclose in pts:
+            if pdate not in idx:
+                continue
+            x, y = _xy(idx[pdate], pclose)
+            if dec == "SELL":
+                marks += f"<path d='M{x:.1f},{y + sy:.1f} L{x - sx:.1f},{y - sy:.1f} L{x + sx:.1f},{y - sy:.1f} Z' fill='{col}'/>"
+            elif dec == "HOLD":
+                marks += f"<circle cx='{x:.1f}' cy='{y:.1f}' r='{sx:.1f}' fill='{col}'/>"
+            else:
+                marks += f"<path d='M{x:.1f},{y - sy:.1f} L{x - sx:.1f},{y + sy:.1f} L{x + sx:.1f},{y + sy:.1f} Z' fill='{col}'/>"
+    return (f"<svg class='t24-ov-spark' viewBox='0 0 {w} {h}' preserveAspectRatio='none'>"
+            f"{line}{marks}</svg>")
+
+
 def overview():
-    done = sum(1 for s in symbols if latest[s] and latest[s].status == "success")
+    # “今日运行状态”只统计今天实际跑成功的标的，避免拿历史成功记录凑满进度
+    done = sum(1 for s in symbols
+               if latest[s] and latest[s].status == "success" and run_is_today(latest[s]))
     running = sum(1 for s in symbols if latest[s] and latest[s].status == "running")
     total = max(len(symbols), 1)
     pct = int(done / total * 100)
+
+    # 决策分布只统计今天实际跑出的结果
+    def _today_decision_count(kind: str) -> int:
+        return sum(1 for s in symbols
+                   if latest[s] and run_is_today(latest[s])
+                   and _norm_decision(latest[s].decision) == kind)
+
+    buys = _today_decision_count("BUY")
+    holds = _today_decision_count("HOLD")
+    sells = _today_decision_count("SELL")
+    # Recent Alerts 只展示近 24 小时的运行
+    recent_runs = [r for r in db.get_runs(conn, limit=50) if run_within_hours(r, 24)][:5]
+    run_word = "分析进行中" if running else ("今日已完成" if done >= len(symbols) else "待运行")
+
     st.markdown(
         "<div class='t24-page-head'>"
-        "<div><div class='t24-headline'>Watchlist Overview</div>"
-        "<div class='t24-subhead'>High-priority targets based on daily agent analysis.</div></div>"
-        "<div class='caps'>Live workspace · Bento grid</div>"
+        "<div><div class='t24-headline'>关注列表总览</div>"
+        "<div class='t24-subhead'>基于每日智能体分析的高优先级标的。</div></div>"
+        "<div class='caps'>Live workspace</div>"
         "</div>",
         unsafe_allow_html=True,
     )
-    main_left, main_right = st.columns([1.35, .95], gap="large")
-    with main_left:
-        for sym in symbols:
-            r = latest[sym]
-            dec = _norm_decision(r.decision if r else None)
-            accent = decision_accent(r.decision if r else None)
-            delta = delta_display(sym)
-            volume = (db.get_prices(conn, sym, limit=1) or [{}])[-1].get("volume")
-            vol_text = f"{volume / 1_000_000:.1f}M" if volume else "—"
-            display_name = names.get(sym, sym) or sym
-            with st.container(border=True):
-                st.markdown(
-                    f"<div style='--accent:{accent};border-left:4px solid {accent};padding-left:14px;'>"
-                    f"<div class='t24-watch-top'>"
-                    f"<div><div class='t24-watch-name'>{html_safe(display_name)}</div>"
-                    f"<div class='t24-watch-code-line'><span class='t24-watch-code'>{html_safe(sym)}</span>"
-                    f"<span class='t24-watch-market'>{html_safe(market_label(sym))}</span></div>"
-                    f"<div class='t24-watch-price'>{html_safe(price_display(sym))}</div></div>"
-                    f"<div class='t24-watch-side'>"
-                    f"<div class='t24-watch-metric'><span class='t24-watch-metric-label'>日涨跌</span>"
-                    f"<span class='t24-watch-metric-value' style='color:{accent};'>{html_safe(delta)}</span></div>"
-                    f"<div class='t24-watch-metric'><span class='t24-watch-metric-label'>成交量</span>"
-                    f"<span class='t24-watch-metric-value'>{html_safe(vol_text)}</span></div></div></div></div>",
-                    unsafe_allow_html=True,
-                )
-                card_prices = db.get_prices(conn, sym, limit=120)
-                card_runs = db.get_runs(conn, ticker=sym, limit=12)
-                st.plotly_chart(
-                    build_sparkline(card_prices, ACTIVE_THEME, card_runs),
-                    width="stretch",
-                    key=f"sp_{sym}",
-                    config={"displayModeBar": False},
-                )
-                if r and r.status == "success":
-                    st.markdown(f"<div class='t24-concl'>{html_safe(conclusion(r.id))}</div>",
-                                unsafe_allow_html=True)
-                elif r and r.status == "failed":
-                    st.markdown("<div class='t24-concl' style='color:var(--t24-danger);'>最近运行失败</div>",
-                                unsafe_allow_html=True)
-                else:
-                    st.markdown("<div class='t24-concl' style='color:var(--t24-muted);'>暂无分析</div>",
-                                unsafe_allow_html=True)
-                st.markdown(
-                    f"<div class='t24-watch-decision' style='--decision:{accent};'>"
-                    f"<div><div class='t24-watch-decision-kicker'>决策状态</div>"
-                    f"<div class='t24-watch-decision-value'>{html_safe(decision_label(r.decision if r else None))}</div></div>"
-                    f"<div class='t24-watch-decision-age'>{html_safe(run_age(r))}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-                if st.button("查看分析", key=f"go_{sym}", width="stretch",
-                             type="primary" if dec == "BUY" else "secondary"):
-                    goto_analysis(sym)
-                    st.rerun()
 
-    # 用真实的决策分布，而不是编造的分析师进度
-    buys = sum(1 for s in symbols if latest[s] and _norm_decision(latest[s].decision) == "BUY")
-    holds = sum(1 for s in symbols if latest[s] and _norm_decision(latest[s].decision) == "HOLD")
-    sells = sum(1 for s in symbols if latest[s] and _norm_decision(latest[s].decision) == "SELL")
-    stage_rows = [
-        ("增持", f"{buys} 只", "var(--t24-primary)", False),
-        ("中性", f"{holds} 只", "var(--t24-muted)", False),
-        ("减持", f"{sells} 只", "var(--t24-danger)", False),
-    ]
-    status_html = (
-        f"<div class='t24-bento'><div class='t24-bento-title'>{icon('cpu', 18)}"
-        f"<span>今日运行状态</span>"
-        f"<span class='t24-data' style='margin-left:auto;font-size:12px;color:var(--t24-muted);'>{done}/{len(symbols)}</span></div>"
-        f"<div class='t24-card-footer' style='margin:0 0 4px;'>"
-        f"<span>{'分析进行中' if running else ('今日已完成' if done >= len(symbols) else '待运行')}</span>"
-        f"<span class='t24-data'>已分析 {done}/{len(symbols)}</span></div>"
-        f"<div class='t24-progress' style='--value:{pct}%;'><span></span></div>"
-    )
-    for label, state, dot, is_running in stage_rows:
-        status_html += (
-            f"<div class='t24-stage-row'><span class='t24-dot {'running' if is_running else ''}' "
-            f"style='--dot:{dot};'></span><span>{label}</span>"
-            f"<span class='t24-data' style='color:{dot};'>{html_safe(state)}</span></div>"
+    # ---- 顶部摘要条：今日运行 / 决策分布 / 近期提醒 ----
+    if recent_runs:
+        a = recent_runs[0]
+        a_href = f"?p=analysis&t={quote(str(a.ticker), safe='')}"
+        alert_body = (
+            f"<div style='display:flex;align-items:center;gap:8px;font-size:13px;'>"
+            f"<span style='color:var(--t24-muted);'>{icon('bell', 16)}</span>"
+            f"<span>{len(recent_runs)} 条 · 最新 "
+            f"<a href='{a_href}' target='_self' style='text-decoration:none;"
+            f"color:{decision_accent(a.decision)};'>{html_safe(a.ticker)} "
+            f"{html_safe(decision_label(a.decision))}</a></span></div>"
         )
-    status_html += "</div>"
+    else:
+        alert_body = "<div style='font-size:13px;color:var(--t24-muted);'>近 24 小时暂无提醒</div>"
 
-    all_runs = db.get_runs(conn, limit=6)
-    alert_html = (
-        f"<div class='t24-bento' style='min-height:360px;'>"
-        f"<div class='t24-bento-title'>{icon('bell', 18)}<span>Recent Alerts</span>"
-        f"<span class='caps' style='margin-left:auto;'>Clear</span></div>"
+    st.markdown(
+        "<div class='t24-ov-summary'>"
+        f"<div class='t24-ov-tile'><div class='t24-ov-tile-label'>今日运行 · {run_word}</div>"
+        f"<div style='display:flex;align-items:baseline;gap:6px;'>"
+        f"<span class='t24-data' style='font-size:24px;color:var(--t24-text);'>{done}</span>"
+        f"<span class='t24-data' style='font-size:14px;color:var(--t24-muted);'>/ {len(symbols)} 已完成</span></div>"
+        f"<div class='t24-progress' style='--value:{pct}%;margin:8px 0 0;'><span></span></div></div>"
+        f"<div class='t24-ov-tile'><div class='t24-ov-tile-label'>今日决策分布</div>"
+        f"<div class='t24-data' style='display:flex;gap:16px;font-size:13px;'>"
+        f"<span style='color:var(--t24-primary);'>● 增持 {buys}</span>"
+        f"<span style='color:var(--t24-muted);'>● 中性 {holds}</span>"
+        f"<span style='color:var(--t24-danger);'>● 减持 {sells}</span></div></div>"
+        f"<div class='t24-ov-tile'><div class='t24-ov-tile-label'>近期提醒</div>{alert_body}</div>"
+        "</div>",
+        unsafe_allow_html=True,
     )
-    for r in all_runs[:5]:
-        d = _norm_decision(r.decision)
-        accent = decision_accent(r.decision)
-        title = "Analysis Completed" if r.status == "success" else status_label(r.status)
-        if d == "SELL":
-            title = "Risk Signal"
-        elif d == "BUY":
-            title = "Opportunity Signal"
-        alert_html += (
-            f"<div class='t24-alert-row'><span style='color:{accent};'>{icon('trend', 17)}</span>"
-            f"<span><strong>{html_safe(title)}: {html_safe(r.ticker)}</strong><br>"
-            f"<span class='t24-data' style='color:var(--t24-muted);font-size:12px;'>"
-            f"{html_safe(run_age(r))} · {html_safe(run_display_no(r))}</span></span>"
-            f"<span>{badge(r.decision)}</span></div>"
+
+    # ---- 公司卡片网格：紧凑、响应式，整卡点进详情（FILO：最新在前）----
+    cards = ""
+    for sym in reversed(symbols):
+        r = latest[sym]
+        href = f"?p=analysis&t={quote(str(sym), safe='')}"
+        if r and r.status == "success":
+            concl = f"<div class='t24-ov-concl'>{html_safe(conclusion(r.id))}</div>"
+        elif r and r.status == "failed":
+            concl = "<div class='t24-ov-concl' style='color:var(--t24-danger);'>最近运行失败</div>"
+        else:
+            concl = "<div class='t24-ov-concl'>暂无分析</div>"
+        cards += (
+            f"<a class='t24-ov-card' href='{href}' target='_self'>"
+            f"<div class='t24-ov-head'><span class='t24-ov-name'>{html_safe(names.get(sym, sym) or sym)}</span>"
+            f"{badge(r.decision if r else None)}</div>"
+            f"<div class='t24-ov-meta'>"
+            f"<span class='t24-ov-code'>{html_safe(sym)} · {html_safe(market_label(sym))}</span>"
+            f"<span><span class='t24-ov-price'>{html_safe(price_display(sym))}</span> "
+            f"<span class='t24-ov-delta' style='color:{delta_color(sym)};'>{html_safe(delta_display(sym))}</span></span>"
+            f"</div>"
+            f"{_sparkline_svg(sym)}"
+            f"{concl}"
+            f"<div class='t24-ov-foot'><span class='t24-ov-foot-age'>{html_safe(run_age(r))}</span>"
+            f"<span class='t24-ov-foot-cta'>查看分析 →</span></div>"
+            f"</a>"
         )
-    alert_html += "</div>"
-    with main_right:
-        st.markdown(
-            f"{status_html}<div class='t24-overview-side-gap'></div>{alert_html}",
-            unsafe_allow_html=True,
-        )
+    st.markdown(f"<div class='t24-ov-grid'>{cards}</div>", unsafe_allow_html=True)
 
 
 def history():
@@ -2910,6 +3585,183 @@ def history():
             report_sections_inline(pick.id)
 
 
+_RUN_STATE_LABEL = {
+    "idle": "待运行", "queued": "排队中", "running": "运行中",
+    "done": "今日已跑", "failed": "今日失败",
+}
+_RUN_STATE_HELP = {
+    "idle": "运行今日分析", "queued": "排队中…", "running": "运行中…",
+    "done": "今日已完成，点击重跑", "failed": "运行失败，点击重跑",
+}
+
+
+def _fmt_num(v) -> str:
+    f = float(v)
+    return str(int(f)) if f.is_integer() else str(f)
+
+
+def _threshold_summary(t) -> str:
+    parts = []
+    if t.upper:
+        parts.append(f"上限 {_fmt_num(t.upper)}")
+    if t.lower:
+        parts.append(f"下限 {_fmt_num(t.lower)}")
+    if t.pct_move:
+        parts.append(f"涨跌 {_fmt_num(t.pct_move)}%")
+    return " · ".join(parts) if parts else "未设阈值"
+
+
+@st.dialog("运行今日分析")
+def _batch_run_confirm(target_syms: list[str]) -> None:
+    s = load_settings()
+    depth = s.max_debate_rounds
+    per_min = 5 if depth <= 1 else (12 if depth <= 3 else 18)
+    est_min = len(target_syms) * per_min
+    est_cost = len(target_syms) * 0.15
+    st.markdown(f"将运行 **{len(target_syms)}** 只：{html_safe('、'.join(target_syms))}")
+    st.caption(
+        f"研究深度={depth} 轮 · 最多 {BATCH_MAX_CONCURRENCY} 并发 · "
+        f"预计约 {est_min} 分钟、约 ${est_cost:.2f}"
+    )
+    if est_cost > s.cost_budget_usd_per_day:
+        st.warning(f"预计成本 ${est_cost:.2f} 超过每日预算 ${s.cost_budget_usd_per_day}")
+    c = st.columns(2)
+    if c[0].button("开始运行", type="primary", width="stretch", key="batch_confirm_go"):
+        start_batch_analysis(target_syms)
+        st.toast(f"已开始运行 {len(target_syms)} 只，可在此页/总览查看进度")
+        st.rerun()
+    if c[1].button("取消", width="stretch", key="batch_confirm_cancel"):
+        st.rerun()
+
+
+@st.dialog("添加标的")
+def _add_ticker_dialog(rt: str, tickers: list) -> None:
+    a = st.columns([2, 2])
+    sym = a[0].text_input("代码", placeholder="NVDA / 600519.SS / 0700.HK")
+    name = a[1].text_input("名称（可选）")
+    b = st.columns(3)
+    upper = b[0].number_input("上限预警", min_value=0.0, value=0.0, step=1.0)
+    lower = b[1].number_input("下限预警", min_value=0.0, value=0.0, step=1.0)
+    pct = b[2].number_input("日涨跌幅% 预警", min_value=0.0, value=0.0, step=1.0)
+    st.caption("填 0 表示不启用该预警阈值。")
+    c = st.columns(2)
+    if c[0].button("添加并校验数据源", type="primary", width="stretch", key="add_dlg_go"):
+        s = sym.strip().upper()
+        if not s:
+            st.error("请填写代码")
+            return
+        if s in [t.symbol for t in tickers]:
+            st.warning(f"{s} 已在列表中")
+            return
+        with st.spinner(f"校验 {s} 数据源…"):
+            try:
+                got = prices.snapshot(conn, s)
+            except Exception:  # noqa: BLE001
+                got = 0
+        if not got:
+            st.error(f"取不到 {s} 的数据，请检查代码格式（美股直接代码 / A股加 .SS/.SZ / 港股加 .HK）")
+            return
+        final_name = name.strip() or resolve_ticker_name(s)
+        tickers.append(TickerCfg(symbol=s, name=final_name,
+                                 upper=upper or None, lower=lower or None, pct_move=pct or None))
+        save_watchlist(rt, tickers)
+        st.toast(f"已添加 {final_name}")
+        st.rerun()
+    if c[1].button("取消", width="stretch", key="add_dlg_cancel"):
+        st.rerun()
+
+
+def _render_edit_drawer(t, rt: str, tickers: list) -> None:
+    with st.container(key=f"wl_drawer_{t.symbol}"):
+        with st.form(f"editform_{t.symbol}", border=False):
+            name = st.text_input("名称", t.name, key=f"edn_{t.symbol}")
+            b = st.columns(3)
+            upper = b[0].number_input("上限预警", min_value=0.0, value=float(t.upper or 0),
+                                      step=1.0, key=f"edu_{t.symbol}")
+            lower = b[1].number_input("下限预警", min_value=0.0, value=float(t.lower or 0),
+                                      step=1.0, key=f"edl_{t.symbol}")
+            pct = b[2].number_input("日涨跌幅% 预警", min_value=0.0, value=float(t.pct_move or 0),
+                                    step=1.0, key=f"edp_{t.symbol}")
+            st.caption("填 0 表示不启用该预警阈值。")
+            fc = st.columns([1, 1, 4])
+            saved = fc[0].form_submit_button("保存", width="stretch", type="primary")
+            canceled = fc[1].form_submit_button("取消", width="stretch")
+        if saved:
+            updated = [
+                TickerCfg(
+                    symbol=x.symbol,
+                    name=name.strip() if x.symbol == t.symbol else x.name,
+                    upper=(upper or None) if x.symbol == t.symbol else x.upper,
+                    lower=(lower or None) if x.symbol == t.symbol else x.lower,
+                    pct_move=(pct or None) if x.symbol == t.symbol else x.pct_move,
+                )
+                for x in tickers
+            ]
+            save_watchlist(rt, updated)
+            st.session_state.editing_symbol = None
+            st.toast(f"已更新 {t.symbol}")
+            st.rerun()
+        if canceled:
+            st.session_state.editing_symbol = None
+            st.rerun()
+
+
+def _render_watchlist_rows(rt: str, tickers: list) -> None:
+    with st.container(key="t24_watchlist"):
+        for t in reversed(tickers):  # 最新加入的标的排最上（FILO），与总览一致
+            stt = today_run_state(t.symbol)
+            cols = st.columns([0.5, 8.0, 0.7, 0.7], gap="small", vertical_alignment="center")
+            if cols[0].button("", key=f"runstate-{stt}-{t.symbol}",
+                              disabled=stt in {"running", "queued"},
+                              help=_RUN_STATE_HELP.get(stt)):
+                start_batch_analysis([t.symbol])
+                st.rerun()
+            cols[1].markdown(
+                f"<div class='t24-wl-row'>"
+                f"<span class='t24-wl-name'>{html_safe(t.name or t.symbol)}</span>"
+                f"<span class='t24-wl-code'>{html_safe(t.symbol)}</span>"
+                f"<span class='t24-wl-th'>{html_safe(_threshold_summary(t))}</span>"
+                f"<span class='t24-today-badge {stt}'>{_RUN_STATE_LABEL.get(stt, stt)}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            if cols[2].button("", key=f"wledit-{t.symbol}", help="编辑"):
+                st.session_state.editing_symbol = (
+                    None if st.session_state.editing_symbol == t.symbol else t.symbol
+                )
+                st.session_state.pending_delete = None
+                st.rerun()
+            if cols[3].button("", key=f"wldel-{t.symbol}", help="删除"):
+                st.session_state.pending_delete = (
+                    None if st.session_state.pending_delete == t.symbol else t.symbol
+                )
+                st.session_state.editing_symbol = None
+                st.rerun()
+            if st.session_state.editing_symbol == t.symbol:
+                _render_edit_drawer(t, rt, tickers)
+            if st.session_state.pending_delete == t.symbol:
+                with st.container(key=f"wl_drawer_{t.symbol}"):
+                    st.warning(f"确认删除 {t.name or t.symbol}？此操作不可撤销。")
+                    dc = st.columns([1, 1, 4])
+                    if dc[0].button("确认删除", type="primary", width="stretch",
+                                    key=f"wldelok-{t.symbol}"):
+                        save_watchlist(rt, [x for x in tickers if x.symbol != t.symbol])
+                        st.session_state.pending_delete = None
+                        st.toast(f"已删除 {t.symbol}")
+                        st.rerun()
+                    if dc[1].button("取消", width="stretch", key=f"wldelcancel-{t.symbol}"):
+                        st.session_state.pending_delete = None
+                        st.rerun()
+
+
+@st.fragment(run_every=5)
+def _watchlist_fragment(rt: str, tickers: list) -> None:
+    _render_watchlist_rows(rt, tickers)
+    still = any(today_run_state(t.symbol) in {"running", "queued"} for t in tickers)
+    if not still:
+        st.rerun()
+
+
 def manage():
     rt, tickers = load_watchlist()
     st.markdown(
@@ -2931,219 +3783,40 @@ def manage():
             st.toast("已保存运行时间")
             st.rerun()
 
-    st.markdown("<div class='caps' style='margin:18px 0 6px;'>当前标的 · 按住左侧把手拖动排序</div>",
-                unsafe_allow_html=True)
     if tickers:
-        label_to_ticker = {ticker_label(t): t for t in tickers}
-        current_labels = list(label_to_ticker.keys())
-        list_col, edit_col, delete_col = st.columns([5.8, .95, .95], gap="small")
-        with list_col:
-            sorted_labels = sort_items(
-                current_labels,
-                direction="vertical",
-                custom_style=f"""
-                html, body, #root {{
-                    margin: 0;
-                    background: {ACTIVE_THEME["surface"]} !important;
-                    color: {ACTIVE_THEME["text"]} !important;
-                }}
-                .sortable-component {{
-                    margin: 4px 0 12px 0;
-                    width: 100%;
-                    box-sizing: border-box;
-                    background: {ACTIVE_THEME["surface"]} !important;
-                    color: {ACTIVE_THEME["text"]} !important;
-                }}
-                .sortable-component.vertical {{
-                    overflow: visible;
-                }}
-                .sortable-container {{
-                    width: 100%;
-                    box-sizing: border-box;
-                }}
-                .sortable-container-body {{
-                    display: flex;
-                    flex-direction: column;
-                    gap: 10px;
-                    padding: 12px;
-                    border: 1px solid {ACTIVE_THEME["border"]};
-                    border-radius: 14px;
-                    background: {ACTIVE_THEME["surface"]};
-                    box-sizing: border-box;
-                    min-height: 0;
-                }}
-                .sortable-item {{
-                    position: relative;
-                    border: 1px solid {ACTIVE_THEME["border"]} !important;
-                    border-radius: 10px;
-                    background: {ACTIVE_THEME["surface_high"]} !important;
-                    color: {ACTIVE_THEME["text"]} !important;
-                    box-sizing: border-box;
-                    font-family: "Geist Mono", monospace;
-                    font-size: 12px;
-                    line-height: 52px !important;
-                    height: 52px;
-                    min-height: 52px;
-                    padding: 0 14px 0 46px !important;
-                    margin: 0 !important;
-                    cursor: grab;
-                    display: flex;
-                    align-items: center;
-                    justify-content: flex-start;
-                    text-align: left;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    box-shadow: none !important;
-                    transition: background-color 160ms ease, border-color 160ms ease !important;
-                }}
-                .sortable-item > * {{
-                    height: 100%;
-                    min-height: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: flex-start;
-                    line-height: 1 !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                }}
-                .sortable-item::before {{
-                    content: "";
-                    position: absolute;
-                    left: 15px;
-                    top: 50%;
-                    width: 18px;
-                    height: 18px;
-                    transform: translateY(-50%);
-                    background: {ACTIVE_THEME["text"]};
-                    opacity: .6;
-                    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 6h2v2H7V6Zm4 0h2v2h-2V6Zm4 0h2v2h-2V6ZM7 11h2v2H7v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2ZM7 16h2v2H7v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 18px 18px no-repeat;
-                    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 6h2v2H7V6Zm4 0h2v2h-2V6Zm4 0h2v2h-2V6ZM7 11h2v2H7v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2ZM7 16h2v2H7v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E") center / 18px 18px no-repeat;
-                }}
-                .sortable-item:hover {{
-                    background: {ACTIVE_THEME["surface"]} !important;
-                    border-color: {ACTIVE_THEME["border_strong"]} !important;
-                }}
-                .sortable-item:active {{
-                    cursor: grabbing;
-                }}
-                """,
-                key="ticker_sorter",
-            )
-        with edit_col:
-            with st.container(key="watchlist_edit_actions"):
-                for t in tickers:
-                    if st.button("编辑", key=f"edit_{t.symbol}", width="stretch"):
-                        st.session_state.editing_symbol = t.symbol
-                        st.session_state.pending_delete = None
-                        st.rerun()
-        with delete_col:
-            with st.container(key="watchlist_delete_actions"):
-                for t in tickers:
-                    if st.button("删除", key=f"del_{t.symbol}", width="stretch"):
-                        st.session_state.pending_delete = t.symbol
-                        st.session_state.editing_symbol = None
-                        st.rerun()
-        if sorted_labels != current_labels and all(label in label_to_ticker for label in sorted_labels):
-            save_watchlist(rt, [label_to_ticker[label] for label in sorted_labels])
-            st.toast("已保存排序")
-            st.rerun()
+        states = [today_run_state(t.symbol) for t in tickers]
+        done = sum(1 for s in states if s == "done")
+        remaining = [t.symbol for t, s in zip(tickers, states) if s in {"idle", "failed"}]
     else:
-        st.info("暂无标的。")
+        states, done, remaining = [], 0, []
 
-    if st.session_state.pending_delete:
-        target = next((t for t in tickers if t.symbol == st.session_state.pending_delete), None)
-        if target:
-            st.warning(f"确认删除 {target.name or target.symbol}？")
-            dc = st.columns([1, 1, 4])
-            if dc[0].button("确认删除", type="primary", width="stretch"):
-                save_watchlist(rt, [t for t in tickers if t.symbol != target.symbol])
-                st.session_state.pending_delete = None
-                st.toast(f"已删除 {target.symbol}")
-                st.rerun()
-            if dc[1].button("取消", width="stretch"):
-                st.session_state.pending_delete = None
-                st.rerun()
+    bar = st.columns([2.3, 1.4, 1.1], vertical_alignment="center")
+    bar[0].markdown(
+        f"<div class='t24-wl-summary'>今日分析 · <b>{done}</b> / {len(tickers)} 已完成</div>",
+        unsafe_allow_html=True,
+    )
+    if remaining:
+        if bar[1].button(f"运行今日剩余（{len(remaining)}）", type="primary",
+                         width="stretch", key="wl_run_remaining"):
+            _batch_run_confirm(remaining)
+    else:
+        bar[1].markdown(
+            "<div class='t24-muted' style='text-align:center;font-size:13px;'>今日已全部完成 ✓</div>",
+            unsafe_allow_html=True,
+        )
+    if bar[2].button("＋ 添加标的", width="stretch", key="wl_add"):
+        _add_ticker_dialog(rt, tickers)
 
-    editing = next((t for t in tickers if t.symbol == st.session_state.editing_symbol), None)
-    if editing:
-        st.markdown("<div class='caps' style='margin:18px 0 6px;'>编辑标的</div>", unsafe_allow_html=True)
-        with st.form(f"edit_{editing.symbol}", border=True):
-            a = st.columns([1, 1])
-            edit_symbol = a[0].text_input("代码", editing.symbol, disabled=True)
-            edit_name = a[1].text_input("名称", editing.name)
-            b = st.columns(3)
-            edit_upper = b[0].number_input(
-                "上限预警", min_value=0.0, value=float(editing.upper or 0), step=1.0,
-                key=f"upper_{editing.symbol}",
-            )
-            edit_lower = b[1].number_input(
-                "下限预警", min_value=0.0, value=float(editing.lower or 0), step=1.0,
-                key=f"lower_{editing.symbol}",
-            )
-            edit_pct = b[2].number_input(
-                "日涨跌幅% 预警", min_value=0.0, value=float(editing.pct_move or 0), step=1.0,
-                key=f"pct_{editing.symbol}",
-            )
-            st.markdown(
-                "<div class='t24-edit-note'>填 0 表示不启用该预警阈值。</div>",
-                unsafe_allow_html=True,
-            )
-            ec = st.columns([1, 1, 4])
-            saved_ticker = ec[0].form_submit_button("保存", width="stretch")
-            canceled_edit = ec[1].form_submit_button("取消", width="stretch")
-        if saved_ticker:
-            updated = []
-            for t in tickers:
-                if t.symbol == edit_symbol:
-                    updated.append(TickerCfg(
-                        symbol=t.symbol,
-                        name=edit_name.strip(),
-                        upper=edit_upper or None,
-                        lower=edit_lower or None,
-                        pct_move=edit_pct or None,
-                    ))
-                else:
-                    updated.append(t)
-            save_watchlist(rt, updated)
-            st.session_state.editing_symbol = None
-            st.toast(f"已更新 {editing.symbol}")
-            st.rerun()
-        if canceled_edit:
-            st.session_state.editing_symbol = None
-            st.rerun()
+    if not tickers:
+        st.info("暂无标的，点「添加标的」开始。")
+        return
 
-    st.markdown("<div class='caps' style='margin:16px 0 6px;'>添加标的</div>", unsafe_allow_html=True)
-    with st.form("add_ticker", clear_on_submit=True):
-        a = st.columns([2, 2])
-        sym = a[0].text_input("代码", placeholder="NVDA / 600519.SS / 0700.HK")
-        name = a[1].text_input("名称（可选）")
-        b = st.columns(3)
-        upper = b[0].number_input("上限预警", min_value=0.0, value=0.0, step=1.0)
-        lower = b[1].number_input("下限预警", min_value=0.0, value=0.0, step=1.0)
-        pct = b[2].number_input("日涨跌幅% 预警", min_value=0.0, value=0.0, step=1.0)
-        if st.form_submit_button("添加并校验数据源"):
-            s = sym.strip().upper()
-            if not s:
-                st.error("请填写代码")
-            elif s in [t.symbol for t in tickers]:
-                st.warning(f"{s} 已在列表中")
-            else:
-                with st.spinner(f"校验 {s} 数据源…"):
-                    try:
-                        got = prices.snapshot(conn, s)
-                    except Exception:  # noqa: BLE001
-                        got = 0
-                if not got:
-                    st.error(f"取不到 {s} 的数据，请检查代码格式（美股直接代码 / A股加 .SS/.SZ / 港股加 .HK）")
-                else:
-                    tickers.append(TickerCfg(symbol=s, name=name.strip(),
-                                             upper=upper or None, lower=lower or None,
-                                             pct_move=pct or None))
-                    save_watchlist(rt, tickers)
-                    st.success(f"已添加 {s}（已抓取 {got} 天价格，运行一次分析后出决策）")
-                    st.rerun()
-
+    busy = bool(st.session_state.editing_symbol or st.session_state.pending_delete)
+    active = any(s in {"running", "queued"} for s in states)
+    if active and not busy:
+        _watchlist_fragment(rt, tickers)
+    else:
+        _render_watchlist_rows(rt, tickers)
 
 def default_ai_run_ids() -> list[int]:
     """默认上下文：详情页=当前标的最近成功记录；否则=每只标的最近成功记录。"""
@@ -3187,6 +3860,21 @@ def render_ai_plugin():
 
     if not st.session_state.ai_panel_open:
         return
+
+    # 面板打开时给居中主容器留出右侧空间，避免固定浮层盖住右列的管理按钮
+    # （只在桌面生效；小屏面板是全屏模态，不需要留白）
+    st.markdown(
+        """
+        <style>
+        @media (min-width: 761px) {
+          .block-container {
+            padding-right: max(1rem, calc(392px - var(--t24-gutter))) !important;
+          }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
     detail = st.session_state.get("detail")
     default_ids = default_ai_run_ids()

@@ -217,7 +217,7 @@ notify:
   target: "telegram:shalow"
 ```
 
-`.env`（密钥）：`DEEPSEEK_API_KEY=...`（已有）。
+`.env`（密钥）：配置 DeepSeek 等 API Key；真实值不进 git。
 
 ---
 

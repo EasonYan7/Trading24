@@ -93,6 +93,18 @@ def add_report(conn, run_id, section, content) -> None:
     conn.commit()
 
 
+def set_report(conn, run_id, section, content) -> None:
+    """幂等写入某段报告：同 (run_id, section) 覆盖为最新内容（供流式逐段更新用）。"""
+    conn.execute(
+        "DELETE FROM reports WHERE run_id=? AND section=?", (run_id, section)
+    )
+    conn.execute(
+        "INSERT INTO reports(run_id, section, content, created_at) VALUES (?,?,?,?)",
+        (run_id, section, content, now_iso()),
+    )
+    conn.commit()
+
+
 def get_reports(conn, run_id) -> list[Report]:
     rows = conn.execute(
         "SELECT * FROM reports WHERE run_id=? ORDER BY id", (run_id,)

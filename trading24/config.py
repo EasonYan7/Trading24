@@ -50,6 +50,8 @@ class Settings:
     quick_think_llm: str = "deepseek-chat"
     backend_url: str | None = None
     max_debate_rounds: int = 1
+    max_risk_discuss_rounds: int = 1
+    output_language: str = "English"
     data_vendors: dict = field(default_factory=dict)
     cost_budget_usd_per_day: float = 5.0
     price_per_1m_input: float = 0.27
@@ -68,6 +70,8 @@ class Settings:
         if self.backend_url:
             cfg["backend_url"] = self.backend_url
         cfg["max_debate_rounds"] = self.max_debate_rounds
+        cfg["max_risk_discuss_rounds"] = self.max_risk_discuss_rounds
+        cfg["output_language"] = self.output_language
         if self.data_vendors:
             cfg["data_vendors"] = {**cfg.get("data_vendors", {}), **self.data_vendors}
         return cfg
@@ -82,6 +86,8 @@ def load_settings() -> Settings:
         quick_think_llm=raw.get("quick_think_llm", "deepseek-chat"),
         backend_url=raw.get("backend_url"),
         max_debate_rounds=raw.get("max_debate_rounds", 1),
+        max_risk_discuss_rounds=raw.get("max_risk_discuss_rounds", raw.get("max_debate_rounds", 1)),
+        output_language=raw.get("output_language", "English"),
         data_vendors=raw.get("data_vendors", {}),
         cost_budget_usd_per_day=raw.get("cost_budget_usd_per_day", 5.0),
         price_per_1m_input=raw.get("price_per_1m_input", 0.27),
@@ -89,6 +95,28 @@ def load_settings() -> Settings:
         notify=raw.get("notify", {}),
         analysts=raw.get("analysts", ["market", "social", "news", "fundamentals"]),
     )
+
+
+def save_settings(s: Settings) -> None:
+    """写回 config/settings.yaml，保留注释无法保留但字段顺序稳定、中文正常。"""
+    out = {
+        "llm_provider": s.llm_provider,
+        "deep_think_llm": s.deep_think_llm,
+        "quick_think_llm": s.quick_think_llm,
+        "backend_url": s.backend_url,
+        "max_debate_rounds": s.max_debate_rounds,
+        "max_risk_discuss_rounds": s.max_risk_discuss_rounds,
+        "output_language": s.output_language,
+        "data_vendors": s.data_vendors or {},
+        "cost_budget_usd_per_day": s.cost_budget_usd_per_day,
+        "price_per_1m_input": s.price_per_1m_input,
+        "price_per_1m_output": s.price_per_1m_output,
+        "notify": s.notify or {},
+        "analysts": list(s.analysts or []),
+    }
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    (CONFIG_DIR / "settings.yaml").write_text(
+        yaml.safe_dump(out, allow_unicode=True, sort_keys=False))
 
 
 def load_watchlist() -> tuple[str, list[TickerCfg]]:

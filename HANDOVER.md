@@ -38,7 +38,7 @@ uv run streamlit run trading24/dashboard/app.py
 
 - 远端：**https://github.com/EasonYan7/Trading24**（private），默认分支 `main`，已配 `origin`。
 - 鉴权：gh CLI 已登录（EasonYan7），git 用 HTTPS + gh 凭证助手。提交后直接 `git push` 即可。
-- `.env`（DeepSeek/FRED 密钥）与 `data/`（数据库）已被 `.gitignore`，**永远不要提交**；只有 `.env.example` 在库里。
+- `.env`（DeepSeek/FRED 密钥）**永远不要提交**；`data/trading24.sqlite` 作为当前可复现数据库随仓库同步，运行日志、WAL/SHM 与本地虚拟环境不进 Git。
 - 迁移到新机器时：`git clone` 后需自建 `.env`（照 `.env.example` 填 key）并 `uv sync`。
 
 ```bash

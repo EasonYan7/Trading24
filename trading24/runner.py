@@ -29,6 +29,58 @@ def _section_map(final_state: dict) -> dict[str, str]:
     return {k: v for k, v in raw.items() if v}
 
 
+def _run_streamed(ta, ticker: str, trade_date: str, conn, run_id: int):
+    """用 graph.stream() 逐节点跑，报告段一产出就落库；返回 (final_state, decision)。
+
+    复用 TradingAgentsGraph 自身的初始化/收尾方法，只额外插入分段落库。
+    开启 checkpoint 或内部 API 不兼容时，回退到稳健的一次性 propagate()。
+    """
+    def _persist_all(final_state: dict) -> None:
+        for section, content in _section_map(final_state).items():
+            db.set_report(conn, run_id, section, str(content))
+
+    if ta.config.get("checkpoint_enabled"):
+        final_state, decision = ta.propagate(ticker, trade_date)
+        _persist_all(final_state)
+        return final_state, decision
+
+    try:
+        ta.ticker = ticker
+        ta._resolve_pending_entries(ticker)
+        past_context = ta.memory_log.get_past_context(ticker)
+        instrument_context = ta.resolve_instrument_context(ticker, "stock")
+        init_state = ta.propagator.create_initial_state(
+            ticker, trade_date, asset_type="stock",
+            past_context=past_context, instrument_context=instrument_context,
+        )
+        args = ta.propagator.get_graph_args()
+    except Exception:  # noqa: BLE001  内部 API 变动时回退，保证仍能跑
+        final_state, decision = ta.propagate(ticker, trade_date)
+        _persist_all(final_state)
+        return final_state, decision
+
+    final_state: dict = {}
+    written: dict[str, str] = {}
+    for chunk in ta.graph.stream(init_state, **args):
+        final_state.update(chunk)
+        for section, content in _section_map(final_state).items():
+            text = str(content)
+            if written.get(section) != text:
+                db.set_report(conn, run_id, section, text)
+                written[section] = text
+
+    ta.curr_state = final_state
+    try:  # 记忆日志/反射失败不影响主结果
+        ta._log_state(trade_date, final_state)
+        ta.memory_log.store_decision(
+            ticker=ticker, trade_date=trade_date,
+            final_trade_decision=final_state["final_trade_decision"],
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return final_state, ta.process_signal(final_state["final_trade_decision"])
+
+
 def run_one(ticker: str, trade_date: str, settings: Settings | None = None,
             conn=None, analysts: list[str] | None = None) -> int:
     """跑一家公司并落库，返回 run_id。异常时标记 failed 并向上抛。
@@ -56,10 +108,8 @@ def run_one(ticker: str, trade_date: str, settings: Settings | None = None,
             config=settings.to_ta_config(),
             callbacks=[stats],
         )
-        final_state, decision = ta.propagate(ticker, trade_date)
-
-        for section, content in _section_map(final_state).items():
-            db.add_report(conn, run_id, section, str(content))
+        # 流式跑图：各段报告一产出就落库，前端可边跑边看
+        final_state, decision = _run_streamed(ta, ticker, trade_date, conn, run_id)
 
         # 价格快照（趋势图用）
         try:
