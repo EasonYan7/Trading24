@@ -3418,8 +3418,13 @@ def overview():
     buys = _today_decision_count("BUY")
     holds = _today_decision_count("HOLD")
     sells = _today_decision_count("SELL")
-    # Recent Alerts 只展示近 24 小时的运行
-    recent_runs = [r for r in db.get_runs(conn, limit=50) if run_within_hours(r, 24)][:5]
+    # Recent Alerts 只展示近 24 小时的有效分析，避免 running/failed 占位记录显示成 “TSLA —”
+    recent_runs = [
+        r for r in db.get_runs(conn, limit=50)
+        if r.status == "success"
+        and _norm_decision(r.decision) in {"BUY", "HOLD", "SELL"}
+        and run_within_hours(r, 24)
+    ][:5]
     run_word = "分析进行中" if running else ("今日已完成" if done >= len(symbols) else "待运行")
 
     st.markdown(
@@ -3433,15 +3438,23 @@ def overview():
 
     # ---- 顶部摘要条：今日运行 / 决策分布 / 近期提醒 ----
     if recent_runs:
-        a = recent_runs[0]
-        a_href = f"?p=analysis&t={quote(str(a.ticker), safe='')}"
+        alert_rows = []
+        for a in recent_runs:
+            a_href = f"?p=analysis&t={quote(str(a.ticker), safe='')}"
+            alert_rows.append(
+                f"<a class='t24-alert-link t24-alert-row' href='{a_href}' target='_self'>"
+                f"<span style='color:{decision_accent(a.decision)};'>{icon('bell', 15)}</span>"
+                f"<span><strong style='color:{decision_accent(a.decision)};'>"
+                f"{html_safe(a.ticker)} {html_safe(decision_label(a.decision))}</strong>"
+                f"<span style='color:var(--t24-muted);'> · "
+                f"{html_safe(names.get(a.ticker, a.ticker))}</span></span>"
+                f"<span style='color:var(--t24-muted);'>{html_safe(run_age(a))}</span>"
+                f"</a>"
+            )
         alert_body = (
-            f"<div style='display:flex;align-items:center;gap:8px;font-size:13px;'>"
-            f"<span style='color:var(--t24-muted);'>{icon('bell', 16)}</span>"
-            f"<span>{len(recent_runs)} 条 · 最新 "
-            f"<a href='{a_href}' target='_self' style='text-decoration:none;"
-            f"color:{decision_accent(a.decision)};'>{html_safe(a.ticker)} "
-            f"{html_safe(decision_label(a.decision))}</a></span></div>"
+            f"<div style='font-size:13px;font-weight:750;margin:0 0 2px;'>"
+            f"{len(recent_runs)} 条</div>"
+            f"<div>{''.join(alert_rows)}</div>"
         )
     else:
         alert_body = "<div style='font-size:13px;color:var(--t24-muted);'>近 24 小时暂无提醒</div>"
