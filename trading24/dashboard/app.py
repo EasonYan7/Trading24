@@ -7,9 +7,11 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 import re
 import threading
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 from urllib.parse import quote
@@ -36,6 +38,12 @@ build_sparkline = charts_mod.build_sparkline
 _norm_decision = charts_mod._norm_decision
 
 st.set_page_config(page_title="Trading24", layout="wide")
+
+# AI 输入组件：带 @ 引用菜单的 composer（原生 textarea 做不了下拉选择交互）
+_AI_COMPOSER = components.declare_component(
+    "t24_ai_composer",
+    path=str(Path(__file__).parent / "components" / "composer"),
+)
 
 THEMES = {
     "浅色": {
@@ -1866,27 +1874,27 @@ button[data-testid^="stBaseButton"]:focus-visible {
         .st-key-t24_ai_panel {
             position: fixed;
             right: 20px;
-            bottom: 20px;
-            width: 356px;
-            height: 492px;
+            bottom: 84px;
+            width: 392px;
+            height: auto;
+            min-height: 180px;
+            max-height: min(820px, calc(100vh - 110px));
             overflow: auto;
             z-index: 2147483000;
             background:var(--t24-surface);
             border:1px solid var(--t24-border-strong);
-            border-top: none;
-            border-radius:0 0 14px 14px;
-            padding:10px 12px 12px;
+            border-radius:14px;
+            padding:0 12px 12px;
             box-shadow: var(--t24-shadow);
         }
         .st-key-t24_ai_panel [data-testid="stVerticalBlock"] { gap: .4rem; }
-        /* sticky 头部：滚动时始终可见 */
-        /* 固定头部（独立于滚动面板，永远可见） */
+        /* sticky 头部：随面板滚动始终可见 */
         .st-key-t24_ai_header {
-            position: fixed; right: 20px; bottom: 512px; width: 356px; z-index: 2147483001;
+            position: sticky; top: 0; z-index: 6;
             background: var(--t24-surface);
-            border: 1px solid var(--t24-border-strong); border-bottom: 1px solid var(--t24-border);
-            border-radius: 14px 14px 0 0; padding: 8px 12px 6px;
-            box-shadow: var(--t24-shadow);
+            margin: 0 -12px 4px;
+            padding: 10px 12px 6px;
+            border-bottom: 1px solid var(--t24-border);
         }
         /* 圆形 × 关闭按钮（头部左侧） */
         .st-key-ai_close button {
@@ -1904,18 +1912,18 @@ button[data-testid^="stBaseButton"]:focus-visible {
             border: none !important; box-shadow: none !important;
         }
         /* 头部图标按钮：新对话(加号) + 选择记录(列表) */
-        .st-key-ai_new_chat button, .st-key-ai_scope_toggle button {
+        .st-key-ai_new_chat button, .st-key-ai_threads_btn button {
             width:30px !important; min-width:30px !important; height:30px !important; min-height:30px !important;
             padding:0 !important; font-size:0 !important;
             border:none !important; background:transparent !important; box-shadow:none !important;
             border-radius:8px !important; color:var(--t24-text-muted, var(--t24-text)) !important;
             display:flex !important; align-items:center !important; justify-content:center !important;
         }
-        .st-key-ai_new_chat button:hover, .st-key-ai_scope_toggle button:hover {
+        .st-key-ai_new_chat button:hover, .st-key-ai_threads_btn button:hover {
             background:color-mix(in srgb, currentColor 12%, transparent) !important;
             border:none !important; box-shadow:none !important;
         }
-        .st-key-ai_new_chat button *, .st-key-ai_scope_toggle button * {
+        .st-key-ai_new_chat button *, .st-key-ai_threads_btn button * {
             position: absolute !important;
             width: 1px !important;
             height: 1px !important;
@@ -1926,7 +1934,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
             white-space: nowrap !important;
             border: 0 !important;
         }
-        .st-key-ai_new_chat button::before, .st-key-ai_scope_toggle button::before {
+        .st-key-ai_new_chat button::before, .st-key-ai_threads_btn button::before {
             content:""; display:block; width:17px; height:17px; background:currentColor;
             -webkit-mask-repeat:no-repeat; -webkit-mask-position:center; -webkit-mask-size:17px;
             mask-repeat:no-repeat; mask-position:center; mask-size:17px;
@@ -1935,12 +1943,63 @@ button[data-testid^="stBaseButton"]:focus-visible {
             -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z'/%3E%3C/svg%3E");
             mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z'/%3E%3C/svg%3E");
         }
-        .st-key-ai_scope_toggle button::before {
+        .st-key-ai_threads_btn button::before {
             -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
             mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
         }
-        .st-key-t24_ai_panel textarea { font-size: 13px !important; }
-        .st-key-t24_ai_panel [data-testid="stForm"] button { font-size: 13px !important; }
+        /* 范围 chip（展开/收起上下文清单） */
+        .st-key-ai_scope_chip button {
+            font-size: 11.5px !important; min-height: 26px !important; padding: 2px 10px !important;
+            width: 100% !important;
+            border-radius: 999px !important;
+            color: var(--t24-primary) !important;
+            background: color-mix(in srgb, var(--t24-primary) 10%, transparent) !important;
+            border: 1px solid color-mix(in srgb, var(--t24-primary) 30%, transparent) !important;
+        }
+        /* 上下文清单（内联展开） */
+        .st-key-t24_ai_scope_panel {
+            border: 1px solid var(--t24-border);
+            border-radius: 12px;
+            padding: 8px 10px;
+            background: var(--t24-surface);
+        }
+        .st-key-t24_ai_scope_panel [data-testid="stVerticalBlock"] { gap: .15rem; }
+        .t24-ai-ctx-row { font-size: 12px; color: var(--t24-muted); line-height: 1.4; }
+        .t24-ai-ctx-row b { color: var(--t24-text); font-weight: 600; }
+        [class*="st-key-ai_ctx_rm_"] button {
+            justify-content: center !important; text-align: center !important;
+            font-size: 11px !important; padding: 2px 0 !important;
+            min-height: 24px !important; width: 100% !important;
+            color: var(--t24-muted) !important; border: none !important; background: transparent !important;
+        }
+        [class*="st-key-ai_ctx_rm_"] button:hover { color: var(--t24-danger) !important; }
+        /* 会话列表条目 */
+        [class*="st-key-ai_thread_"] button {
+            text-align: left !important; justify-content: flex-start !important;
+            font-size: 12.5px !important; white-space: normal !important;
+            padding: 8px 11px !important; line-height: 1.35 !important; border-radius: 10px !important;
+        }
+        [class*="st-key-ai_thread_del_"] button {
+            justify-content: center !important; text-align: center !important;
+            font-size: 12px !important; padding: 4px 0 !important; min-height: 30px !important;
+            color: var(--t24-muted) !important; border: none !important; background: transparent !important;
+        }
+        [class*="st-key-ai_thread_del_"] button:hover { color: var(--t24-danger) !important; }
+        /* 流式回答容器：按 assistant 气泡样式 */
+        .st-key-t24_ai_streaming {
+            border: 1px solid var(--t24-border); border-radius: 10px;
+            padding: 8px 11px; margin: 6px 0; background: var(--t24-ai-assistant);
+        }
+        .st-key-t24_ai_streaming :is(p, li) {
+            font-size: 13px !important; line-height: 1.55 !important; margin: .25em 0 !important;
+        }
+        /* 消息里的引用 chips */
+        .t24-ai-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+        .t24-ai-chip {
+            border: 1px solid var(--t24-border); border-radius: 999px; padding: 2px 8px;
+            color: var(--t24-muted); font-size: 10.5px; font-weight: 600;
+        }
+        .st-key-t24_ai_panel iframe { display: block; }
         [class*="st-key-ai_sugg_"] button {
             font-size: 12.5px !important; white-space: normal !important; text-align: left !important;
             padding: 6px 11px !important; min-height: 0 !important; line-height: 1.35 !important;
@@ -1955,13 +2014,39 @@ button[data-testid^="stBaseButton"]:focus-visible {
             }
             .t24-page-title { font-size: 26px; }
             .st-key-t24_ai_launcher { right: 12px; bottom: 14px; width: 52px; }
-            .st-key-t24_ai_header {
-                left: 12px; right: 12px; width: auto; bottom: auto; top: 12px;
-                border-radius: 14px 14px 0 0;
-            }
+            /* 小屏：面板几乎全屏（盖住 launcher，用头部 ✕ 关闭） */
             .st-key-t24_ai_panel {
                 left: 12px; right: 12px; width: auto;
-                top: 64px; bottom: 12px; height: auto;
+                bottom: 12px; max-height: calc(100vh - 24px);
+            }
+            /* 小屏禁止面板内 columns 堆叠：头部按钮保持一行 */
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has(.st-key-ai_threads_btn) {
+                flex-wrap: nowrap !important;
+            }
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has(.st-key-ai_threads_btn)
+                > [data-testid="stColumn"] {
+                flex: 0 0 40px !important; width: 40px !important; min-width: 0 !important;
+            }
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has(.st-key-ai_threads_btn)
+                > [data-testid="stColumn"]:nth-child(2) {
+                flex: 1 1 auto !important; width: auto !important;
+            }
+            /* 上下文清单行 / 会话列表行：内容 + ✕ 保持一行 */
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has([class*="st-key-ai_ctx_rm_"]),
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has([class*="st-key-ai_thread_del_"]) {
+                flex-wrap: nowrap !important;
+            }
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has([class*="st-key-ai_ctx_rm_"])
+                > [data-testid="stColumn"]:first-child,
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has([class*="st-key-ai_thread_del_"])
+                > [data-testid="stColumn"]:first-child {
+                flex: 1 1 auto !important; width: auto !important; min-width: 0 !important;
+            }
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has([class*="st-key-ai_ctx_rm_"])
+                > [data-testid="stColumn"]:last-child,
+            .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has([class*="st-key-ai_thread_del_"])
+                > [data-testid="stColumn"]:last-child {
+                flex: 0 0 34px !important; width: 34px !important; min-width: 0 !important;
             }
         }
 hr { border-color:var(--t24-border); }
@@ -2225,11 +2310,23 @@ if "analysis_delete_symbol" not in st.session_state:
 if "ai_panel_open" not in st.session_state:
     st.session_state.ai_panel_open = False
 if "ai_selected_run_ids" not in st.session_state:
+    # 「发给 AI」入口的交接位：面板打开时转成一条带固定记录的会话
     st.session_state.ai_selected_run_ids = []
-if "ai_messages" not in st.session_state:
-    st.session_state.ai_messages = []
-if "ai_show_history" not in st.session_state:
-    st.session_state.ai_show_history = True
+if "ai_threads" not in st.session_state:
+    # 会话模型：[{id, title, scope_mode: page|manual, scope_syms, run_override, messages}]
+    st.session_state.ai_threads = []
+if "ai_active_thread" not in st.session_state:
+    st.session_state.ai_active_thread = None
+if "ai_view" not in st.session_state:
+    st.session_state.ai_view = "chat"  # chat | threads
+if "ai_pending" not in st.session_state:
+    st.session_state.ai_pending = None  # 待流式回答的提问
+if "ai_composer_ts" not in st.session_state:
+    st.session_state.ai_composer_ts = 0  # composer 组件提交去重
+if "ai_thread_seq" not in st.session_state:
+    st.session_state.ai_thread_seq = 0
+if "ai_scope_open" not in st.session_state:
+    st.session_state.ai_scope_open = False
 if "search_nonce" not in st.session_state:
     st.session_state.search_nonce = 0
 if "pending_analysis_symbols" not in st.session_state:
@@ -2353,13 +2450,12 @@ def build_ai_context(run_ids: list[int]) -> str:
     return "\n\n---\n\n".join(report_context_for_run(run) for run in runs)
 
 
-def ask_ai(prompt: str, context_text: str, history: list | None = None) -> tuple[bool, str]:
+def _ai_chat_request(prompt: str, context_text: str, history: list | None):
+    """构造 chat/completions 请求；未配置密钥时抛 RuntimeError(用户可读文案)。"""
     settings = load_settings()
     api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY")
     if not api_key:
-        return False, (
-            "还没有配置模型密钥。配置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY 后即可对话。"
-        )
+        raise RuntimeError("还没有配置模型密钥。配置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY 后即可对话。")
     base_url = (settings.backend_url or "https://api.deepseek.com/v1").rstrip("/")
     url = base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
     # 系统消息只带一次分析记录，随后附上多轮对话历史 → 支持连续追问
@@ -2383,19 +2479,43 @@ def ask_ai(prompt: str, context_text: str, history: list | None = None) -> tuple
         "messages": messages,
         "temperature": 0.2,
     }
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    return url, headers, payload
+
+
+def ask_ai(prompt: str, context_text: str, history: list | None = None) -> tuple[bool, str]:
     try:
-        resp = httpx.post(
-            url,
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json=payload,
-            timeout=90,
-        )
+        url, headers, payload = _ai_chat_request(prompt, context_text, history)
+    except RuntimeError as exc:
+        return False, str(exc)
+    try:
+        resp = httpx.post(url, headers=headers, json=payload, timeout=90)
         resp.raise_for_status()
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
         return True, content.strip()
     except Exception as exc:  # noqa: BLE001
         return False, f"AI 请求失败：{type(exc).__name__}。请检查模型密钥、网络和 settings.yaml 的模型配置。"
+
+
+def stream_ai(prompt: str, context_text: str, history: list | None = None):
+    """流式回答生成器。未配置密钥抛 RuntimeError，网络/接口错误按原样抛出。"""
+    url, headers, payload = _ai_chat_request(prompt, context_text, history)
+    payload["stream"] = True
+    with httpx.stream("POST", url, headers=headers, json=payload, timeout=120) as resp:
+        resp.raise_for_status()
+        for line in resp.iter_lines():
+            if not line or not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                delta = json.loads(data)["choices"][0]["delta"].get("content") or ""
+            except (KeyError, IndexError, ValueError):
+                continue
+            if delta:
+                yield delta
 
 
 def resolve_ticker_name(symbol: str) -> str:
@@ -3831,36 +3951,254 @@ def manage():
     else:
         _render_watchlist_rows(rt, tickers)
 
-def default_ai_run_ids() -> list[int]:
-    """默认上下文：详情页=当前标的最近成功记录；否则=每只标的最近成功记录。"""
+def _new_ai_thread(title: str = "新对话", run_override: list[int] | None = None):
+    st.session_state.ai_thread_seq += 1
+    thread = {
+        "id": st.session_state.ai_thread_seq,
+        "title": title,
+        "pinned_syms": [],          # @ 引用后钉进会话的标的，对后续轮次持续生效
+        "excluded_syms": [],        # 从跟随页面基础范围移除的标的
+        "run_override": [int(x) for x in (run_override or [])],  # 「发给 AI」固定记录
+        "messages": [],
+    }
+    st.session_state.ai_threads.insert(0, thread)
+    st.session_state.ai_active_thread = thread["id"]
+    st.session_state.ai_view = "chat"
+    return thread
+
+
+def _normalize_ai_thread(t):
+    t.setdefault("pinned_syms", [])
+    t.setdefault("excluded_syms", [])
+    t.setdefault("run_override", [])
+    return t
+
+
+def active_ai_thread():
+    for t in st.session_state.ai_threads:
+        if t["id"] == st.session_state.ai_active_thread:
+            return _normalize_ai_thread(t)
+    if st.session_state.ai_threads:
+        st.session_state.ai_active_thread = st.session_state.ai_threads[0]["id"]
+        return _normalize_ai_thread(st.session_state.ai_threads[0])
+    return _new_ai_thread()
+
+
+def _latest_success_run_id(sym: str) -> int | None:
+    r = latest.get(sym)
+    if r and r.status == "success" and r.id:
+        return int(r.id)
+    return None
+
+
+def thread_scope_syms(thread) -> list[str]:
+    """当前生效的上下文标的 = (跟随页面基础范围 − 移除项) + @ 钉住项。"""
     detail = st.session_state.get("detail")
-    if detail:
-        r = latest.get(detail)
-        if r and r.status == "success" and r.id:
-            return [int(r.id)]
+    base = [detail] if detail and detail in symbols else list(symbols)
+    excluded = set(thread.get("excluded_syms") or [])
+    effective = [s for s in base if s not in excluded]
+    for s in (thread.get("pinned_syms") or []):
+        if s in symbols and s not in effective:
+            effective.append(s)
+    return effective
+
+
+def thread_run_ids(thread) -> list[int]:
+    if thread.get("run_override"):
+        return list(thread["run_override"])
     ids = []
-    for s in symbols:
-        r = latest.get(s)
-        if r and r.status == "success" and r.id:
-            ids.append(int(r.id))
+    for s in thread_scope_syms(thread):
+        rid = _latest_success_run_id(s)
+        if rid is not None:
+            ids.append(rid)
     return ids
 
 
-def _send_ai(prompt: str, run_ids: list[int]) -> None:
+def thread_scope_desc(thread) -> str:
+    if thread.get("run_override"):
+        return f"固定记录 · {len(thread['run_override'])} 条"
+    detail = st.session_state.get("detail")
+    base = [detail] if detail and detail in symbols else list(symbols)
+    excluded = [s for s in (thread.get("excluded_syms") or []) if s in base]
+    pinned = [s for s in (thread.get("pinned_syms") or []) if s in symbols and s not in base]
+    label = (names.get(detail, detail) if detail and detail in symbols
+             else f"全部 {len(symbols)} 只")
+    if pinned:
+        label += f" +{len(pinned)}"
+    if excluded:
+        label += f" −{len(excluded)}"
+    return label
+
+
+def _ai_mention_options(thread) -> list[dict]:
+    """@ 菜单数据：本页标的 > 范围内 > 其余；组内按分析时间从新到旧。"""
+    detail = st.session_state.get("detail")
+    scope_now = set(thread_scope_syms(thread)) if not thread.get("run_override") else set()
+    rows = []
+    for s in symbols:
+        r = latest.get(s)
+        if not (r and r.status == "success" and r.id):
+            continue
+        rank = 0 if s == detail else (1 if s in scope_now else 2)
+        tag = "本页" if s == detail else ("范围内" if s in scope_now else "")
+        ts = run_timestamp(r)
+        rows.append((rank, -(ts.timestamp() if ts else 0), {
+            "sym": s,
+            "name": names.get(s, s),
+            "decision": BADGE.get(_norm_decision(r.decision), ("", "—"))[1],
+            "age": run_age(r),
+            "tag": tag,
+        }))
+    rows.sort(key=lambda x: (x[0], x[1]))
+    return [x[2] for x in rows]
+
+
+def _parse_ai_mentions(text: str) -> list[str]:
+    """从文本解析 @代码 / @中文名 引用。"""
+    found = []
+    for s in symbols:
+        nm = names.get(s, s)
+        if re.search("@" + re.escape(s) + r"(?![A-Za-z0-9.])", text, re.I) or f"@{nm}" in text:
+            found.append(s)
+    return found
+
+
+def _queue_ai(prompt: str, thread) -> None:
+    """入队一条提问：追加用户消息并标记 pending，流式回答在下一次渲染时进行。"""
     prompt = (prompt or "").strip()
-    if not prompt:
+    if not prompt or st.session_state.ai_pending:
         return
+    mention_labels = []
+    if not thread.get("run_override"):
+        current = set(thread_scope_syms(thread))
+        for s in _parse_ai_mentions(prompt):
+            # @ 过的标的钉进会话，对后续轮次持续生效；同时解除此前的移除
+            if s not in thread["pinned_syms"]:
+                thread["pinned_syms"].append(s)
+            thread["excluded_syms"] = [x for x in thread["excluded_syms"] if x != s]
+            if s not in current:
+                mention_labels.append(f"@ {names.get(s, s)}")
+    run_ids = thread_run_ids(thread)
     if not run_ids:
-        st.session_state.ai_messages.append({
+        thread["messages"].append({
             "role": "assistant", "ok": False, "attachments": [],
             "content": "还没有可用的分析记录。先在关注列表跑一次分析，我就能基于结果回答了。"})
         return
     labels = [full_run_label(r) for r in selected_ai_runs(run_ids)]
-    history = list(st.session_state.ai_messages)  # 本轮提问之前的对话历史
-    st.session_state.ai_messages.append({"role": "user", "content": prompt, "attachments": labels})
-    with st.spinner("AI 正在思考…"):
-        ok, answer = ask_ai(prompt, build_ai_context(run_ids), history)
-    st.session_state.ai_messages.append({"role": "assistant", "content": answer, "ok": ok, "attachments": labels})
+    thread["messages"].append({"role": "user", "content": prompt, "attachments": mention_labels})
+    if thread["title"] == "新对话":
+        thread["title"] = prompt[:14] + ("…" if len(prompt) > 14 else "")
+    st.session_state.ai_pending = {"thread_id": thread["id"], "prompt": prompt,
+                                   "run_ids": run_ids, "labels": labels}
+
+
+def _render_ai_message(msg) -> None:
+    role_label = "你" if msg["role"] == "user" else "AI"
+    css_role = "user" if msg["role"] == "user" else "assistant"
+    body = (html_safe(msg["content"]).replace(chr(10), "<br>") if msg["role"] == "user"
+            else report_text_html(msg["content"]))
+    chips = "".join(
+        f"<span class='t24-ai-chip'>{html_safe(lb)}</span>"
+        for lb in (msg.get("attachments") or [])[:4]
+    )
+    chips_html = f"<div class='t24-ai-chips'>{chips}</div>" if chips else ""
+    st.markdown(
+        f"<div class='t24-ai-msg {css_role}'>"
+        f"<div class='t24-ai-meta'>{role_label}</div>"
+        f"<div>{body}</div>{chips_html}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_ai_threads_view() -> None:
+    if st.button("＋ 新对话", key="ai_new_thread_btn", type="primary", width="stretch"):
+        _new_ai_thread()
+        st.rerun()
+    for t in st.session_state.ai_threads:
+        cols = st.columns([5, 0.9], vertical_alignment="center")
+        n = len(t["messages"])
+        active = "▸ " if t["id"] == st.session_state.ai_active_thread else ""
+        if cols[0].button(f"{active}{t['title']} · {thread_scope_desc(t)} · {n} 条",
+                          key=f"ai_thread_{t['id']}", width="stretch"):
+            st.session_state.ai_active_thread = t["id"]
+            st.session_state.ai_view = "chat"
+            st.rerun()
+        if cols[1].button("✕", key=f"ai_thread_del_{t['id']}"):
+            st.session_state.ai_threads = [x for x in st.session_state.ai_threads if x["id"] != t["id"]]
+            if st.session_state.ai_active_thread == t["id"]:
+                st.session_state.ai_active_thread = None
+            st.rerun()
+
+
+def _render_ai_scope_section(thread) -> None:
+    arrow = " ▴" if st.session_state.ai_scope_open else " ▾"
+    if st.button(thread_scope_desc(thread) + arrow, key="ai_scope_chip"):
+        st.session_state.ai_scope_open = not st.session_state.ai_scope_open
+        st.rerun()
+    if not st.session_state.ai_scope_open:
+        return
+    with st.container(key="t24_ai_scope_panel"):
+        if thread.get("run_override"):
+            st.caption("本会话固定引用以下记录（来自「发给 AI」）：")
+            for r in selected_ai_runs(thread["run_override"]):
+                st.caption(f"· {full_run_label(r)}")
+            if st.button("清除，改用自动范围", key=f"ai_clear_override_{thread['id']}", width="stretch"):
+                thread["run_override"] = []
+                st.rerun()
+            return
+        detail = st.session_state.get("detail")
+        base = [detail] if detail and detail in symbols else list(symbols)
+        effective = thread_scope_syms(thread)
+        st.caption("本会话的上下文 = 跟随页面 + @ 引用。点 ✕ 移除，输入 @ 添加。")
+        for s in effective:
+            cols = st.columns([6, 0.9], vertical_alignment="center")
+            origin = "本页" if s == detail else ("关注列表" if s in base else "@ 引用")
+            cols[0].markdown(
+                f"<div class='t24-ai-ctx-row'><b>{html_safe(names.get(s, s))}</b>"
+                f" · {html_safe(s)} · {html_safe(origin)} · {html_safe(run_age(latest.get(s)))}</div>",
+                unsafe_allow_html=True)
+            if cols[1].button("✕", key=f"ai_ctx_rm_{thread['id']}_{s}"):
+                if s in thread["pinned_syms"]:
+                    thread["pinned_syms"] = [x for x in thread["pinned_syms"] if x != s]
+                else:
+                    thread["excluded_syms"].append(s)
+                st.rerun()
+        removed = [s for s in thread["excluded_syms"] if s in base]
+        if removed:
+            st.caption("已移除：" + "、".join(names.get(s, s) for s in removed))
+            if st.button("全部恢复", key=f"ai_ctx_restore_{thread['id']}", width="stretch"):
+                thread["excluded_syms"] = []
+                st.rerun()
+        if not effective:
+            st.caption("上下文为空——恢复移除项，或在输入框用 @ 添加标的。")
+
+
+def _stream_pending_answer(thread, pending) -> None:
+    """流式生成回答并落库到会话消息。"""
+    history = thread["messages"][:-1]  # 刚追加的用户消息不算历史
+    status = {"ok": True}
+
+    def _gen():
+        try:
+            yield from stream_ai(pending["prompt"], build_ai_context(pending["run_ids"]), history)
+        except RuntimeError as exc:
+            status["ok"] = False
+            yield str(exc)
+        except Exception as exc:  # noqa: BLE001
+            status["ok"] = False
+            yield f"AI 请求失败：{type(exc).__name__}。请检查模型密钥、网络和 settings.yaml 的模型配置。"
+
+    with st.container(key="t24_ai_streaming"):
+        st.markdown("<div class='t24-ai-meta'>AI</div>", unsafe_allow_html=True)
+        full = st.write_stream(_gen)
+    if isinstance(full, list):
+        full = "".join(str(x) for x in full)
+    thread["messages"].append({
+        "role": "assistant", "content": str(full or "").strip(), "ok": status["ok"],
+        "attachments": pending.get("labels", [])[:3],
+    })
+    # 不主动 rerun:流式内容已在屏上,下一次交互时自然并入历史消息
+    st.session_state.ai_pending = None
 
 
 def render_ai_plugin():
@@ -3871,53 +4209,53 @@ def render_ai_plugin():
             st.session_state.ai_panel_open = not st.session_state.ai_panel_open
             st.rerun()
 
+    # 「发给 AI」交接：转成一条固定记录的新会话
+    handoff = [int(x) for x in st.session_state.ai_selected_run_ids if str(x).isdigit()]
+    if handoff:
+        st.session_state.ai_selected_run_ids = []
+        _new_ai_thread(title=f"选中的 {len(handoff)} 条记录", run_override=handoff)
+
     if not st.session_state.ai_panel_open:
         return
 
-    detail = st.session_state.get("detail")
-    default_ids = default_ai_run_ids()
-    override = [int(x) for x in st.session_state.ai_selected_run_ids if str(x).isdigit()]
-    effective_ids = override or default_ids
-    if override:
-        scope_desc = f"手动选定的 {len(override)} 条记录"
-    elif detail:
-        scope_desc = f"当前标的 · {names.get(detail, detail)}"
-    else:
-        scope_desc = f"全部关注列表 · {len(default_ids)} 只"
-
-    with st.container(key="t24_ai_header"):
-        hc = st.columns([0.9, 2.7, 0.8, 0.8], vertical_alignment="center")
-        if hc[0].button("✕", key="ai_close"):
-            st.session_state.ai_panel_open = False
-            st.rerun()
-        hc[1].markdown("<div class='t24-ai-title'>AI 助手</div>", unsafe_allow_html=True)
-        if hc[2].button("选择记录", key="ai_scope_toggle", width="stretch"):
-            st.session_state.ai_show_advanced = not st.session_state.get("ai_show_advanced", False)
-            st.rerun()
-        if hc[3].button("新对话", key="ai_new_chat", width="stretch"):
-            st.session_state.ai_messages = []
-            st.rerun()
+    thread = active_ai_thread()
+    pending = st.session_state.ai_pending
+    if pending and pending.get("thread_id") != thread["id"]:
+        pending = None  # 只在所属会话里续流
 
     with st.container(key="t24_ai_panel"):
-        st.markdown(
-            f"<div class='t24-muted t24-ai-scope'>分析范围：{html_safe(scope_desc)}</div>",
-            unsafe_allow_html=True,
-        )
+        # 头部：会话列表 / 标题+范围 / 新对话 / 关闭
+        with st.container(key="t24_ai_header"):
+            hc = st.columns([0.62, 3.2, 0.62, 0.62], vertical_alignment="center")
+            threads_open = st.session_state.ai_view == "threads"
+            if hc[0].button("☰", key="ai_threads_btn",
+                            help="返回对话" if threads_open else "会话列表"):
+                st.session_state.ai_view = "chat" if threads_open else "threads"
+                st.rerun()
+            title = "会话" if threads_open else thread["title"]
+            hc[1].markdown(f"<div class='t24-ai-title'>{html_safe(title)}</div>",
+                           unsafe_allow_html=True)
+            if hc[2].button("＋", key="ai_new_chat", help="新对话"):
+                _new_ai_thread()
+                st.rerun()
+            if hc[3].button("✕", key="ai_close", help="关闭"):
+                st.session_state.ai_panel_open = False
+                st.rerun()
 
-        # 对话主体
-        if st.session_state.ai_messages:
-            for msg in st.session_state.ai_messages[-12:]:
-                role_label = "你" if msg["role"] == "user" else "AI"
-                css_role = "user" if msg["role"] == "user" else "assistant"
-                body = (html_safe(msg["content"]).replace(chr(10), "<br>") if msg["role"] == "user"
-                        else report_text_html(msg["content"]))
-                st.markdown(
-                    f"<div class='t24-ai-msg {css_role}'>"
-                    f"<div class='t24-ai-meta'>{role_label}</div>"
-                    f"<div>{body}</div></div>",
-                    unsafe_allow_html=True,
-                )
-        else:
+        if st.session_state.ai_view == "threads":
+            _render_ai_threads_view()
+            return
+
+        with st.container(key="t24_ai_scope_row"):
+            _render_ai_scope_section(thread)
+
+        # 消息流
+        for msg in thread["messages"][-16:]:
+            _render_ai_message(msg)
+
+        # 空会话:建议问题
+        if not thread["messages"] and not pending:
+            detail = st.session_state.get("detail")
             if detail:
                 nm = names.get(detail, detail)
                 sugg = [f"{nm} 现在的核心风险是什么？", f"{nm} 的多空分歧在哪？", "给我一句话操作建议"]
@@ -3927,29 +4265,37 @@ def render_ai_plugin():
                         unsafe_allow_html=True)
             for i, q in enumerate(sugg):
                 if st.button(q, key=f"ai_sugg_{i}", width="stretch"):
-                    _send_ai(q, effective_ids)
+                    _queue_ai(q, thread)
                     st.rerun()
 
-        # 输入（表单：提交后自动清空）
-        with st.form("ai_form", clear_on_submit=True):
-            user_prompt = st.text_area(
-                "提问", height=80, label_visibility="collapsed",
-                placeholder="问我关于这些分析的任何问题…")
-            if st.form_submit_button("发送", type="primary", width="stretch"):
-                _send_ai(user_prompt, effective_ids)
-                st.rerun()
+        # 流式回答:同步生成,期间输入区暂不渲染,结束后组件在下方恢复
+        if pending:
+            _stream_pending_answer(thread, pending)
 
-        # 高级：手动指定上下文（默认隐藏；留空=自动）
-        if st.session_state.get("ai_show_advanced", False):
-            available_runs = [r for r in db.get_runs(conn, limit=200) if r.status == "success"]
-            available_ids = [int(r.id) for r in available_runs if r.id is not None]
-            available_by_id = {int(r.id): r for r in available_runs if r.id is not None}
-            chosen_ids = st.multiselect(
-                "手动选择分析记录（留空=按上面的范围自动）",
-                available_ids, default=override, key="ai_run_picker",
-                format_func=lambda rid: full_run_label(available_by_id[rid]) if rid in available_by_id else f"#{rid}",
-            )
-            st.session_state.ai_selected_run_ids = [int(rid) for rid in chosen_ids]
+        # 输入组件(@ 引用菜单在组件内)
+        result = _AI_COMPOSER(
+            stocks=_ai_mention_options(thread),
+            theme={
+                "surface": ACTIVE_THEME["surface"],
+                "text": ACTIVE_THEME["text"],
+                "muted": ACTIVE_THEME["muted"],
+                "subtle": ACTIVE_THEME["subtle"],
+                "border": ACTIVE_THEME["border"],
+                "border_strong": ACTIVE_THEME["border_strong"],
+                "primary": ACTIVE_THEME["primary"],
+                "primary_text": ACTIVE_THEME["primary_text"],
+            },
+            placeholder="问我任何问题，输入 @ 可引用其他标的数据…",
+            disabled=bool(st.session_state.ai_pending),
+            key="ai_composer",
+            default=None,
+        )
+        if (result and isinstance(result, dict) and result.get("ts")
+                and result["ts"] != st.session_state.ai_composer_ts
+                and not st.session_state.ai_pending):
+            st.session_state.ai_composer_ts = result["ts"]
+            _queue_ai(str(result.get("text", "")), thread)
+            st.rerun()
 
 
 # ---- 路由 ----

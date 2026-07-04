@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard",
+      "runtimeExecutable": ".venv/bin/streamlit",
+      "runtimeArgs": ["run", "trading24/dashboard/app.py", "--server.port", "8735", "--server.headless", "true"],
+      "port": 8735
+    },
+    {
+      "name": "ai-demo",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8734", "--directory", "audits/ai-chatbot-demo-2026-07-04"],
+      "port": 8734
+    }
+  ]
+}

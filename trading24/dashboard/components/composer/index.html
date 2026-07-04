@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; }
+  body {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 100vh;
+  }
+
+  .mention-menu {
+    display: none;
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, .35);
+    overflow-y: auto;
+    max-height: 240px;
+    margin-bottom: 8px;
+  }
+  .mention-menu.open { display: block; }
+  .mention-head {
+    padding: 7px 11px;
+    color: var(--subtle);
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mention-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 11px;
+    font: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    background: none;
+    border: 0;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .mention-item .sym { font-weight: 700; min-width: 72px; flex: 0 0 auto; }
+  .mention-item .name { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mention-item .tag {
+    flex: 0 0 auto;
+    color: var(--primary);
+    border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+    border-radius: 999px;
+    padding: 1px 7px;
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+  .mention-item time { color: var(--subtle); font-size: 11px; flex: 0 0 auto; }
+  .mention-item.selected, .mention-item:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+
+  .composer-box {
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 7px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px;
+    align-items: end;
+  }
+  .composer-box:focus-within { border-color: color-mix(in srgb, var(--primary) 55%, var(--border-strong)); }
+
+  textarea {
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text);
+    background: transparent;
+    border: 0;
+    outline: 0;
+    resize: none;
+    width: 100%;
+    min-height: 38px;
+    max-height: 108px;
+    padding: 7px 5px;
+  }
+  textarea::placeholder { color: var(--subtle); }
+  textarea:disabled { opacity: .55; }
+
+  .send {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--primary);
+    color: var(--primary-text);
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .send:disabled { opacity: .4; cursor: default; }
+  .hint { color: var(--subtle); font-size: 10.5px; margin-top: 5px; }
+</style>
+</head>
+<body>
+  <div class="mention-menu" id="menu"></div>
+  <form id="form">
+    <div class="composer-box">
+      <textarea id="input" rows="1" placeholder=""></textarea>
+      <button class="send" id="send" type="submit" title="发送 (Enter)">↑</button>
+    </div>
+    <div class="hint">Enter 发送 · Shift+Enter 换行 · @ 引用标的数据作为背景</div>
+  </form>
+
+<script>
+(function () {
+  "use strict";
+
+  function post(type, data) {
+    window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data || {}), "*");
+  }
+  function setFrameHeight(h) { post("streamlit:setFrameHeight", { height: h }); }
+  function setValue(v) { post("streamlit:setComponentValue", { value: v, dataType: "json" }); }
+
+  const menu = document.getElementById("menu");
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  const form = document.getElementById("form");
+
+  let stocks = [];        // [{sym, name, decision, age, tag}] 已按优先级排序
+  let items = [];         // 当前过滤结果
+  let index = 0;
+  let mentionStart = -1;
+  let disabled = false;
+
+  const BASE_H = 96;
+
+  function syncHeight() {
+    const menuH = menu.classList.contains("open") ? Math.min(menu.scrollHeight, 240) + 10 : 0;
+    const inputH = Math.max(0, input.scrollHeight - 38);
+    setFrameHeight(BASE_H + menuH + Math.min(inputH, 70));
+    if (menuH) scrollHostToBottom();
+  }
+
+  function scrollHostToBottom() {
+    try {
+      const panel = window.parent.document.querySelector(".st-key-t24_ai_panel");
+      if (panel) panel.scrollTop = panel.scrollHeight;
+    } catch (e) { /* 跨域时忽略 */ }
+  }
+
+  function closeMenu() {
+    menu.classList.remove("open");
+    items = [];
+    mentionStart = -1;
+    syncHeight();
+  }
+
+  function renderMenu() {
+    menu.innerHTML = "";
+    const head = document.createElement("div");
+    head.className = "mention-head";
+    head.textContent = "引用标的数据作为背景(↑↓ 选择,Enter 确认)";
+    menu.appendChild(head);
+    items.forEach(function (s, i) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mention-item" + (i === index ? " selected" : "");
+      const sym = document.createElement("span"); sym.className = "sym"; sym.textContent = s.sym;
+      const name = document.createElement("span"); name.className = "name"; name.textContent = s.name + " · " + s.decision;
+      btn.append(sym, name);
+      if (s.tag) {
+        const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = s.tag;
+        btn.appendChild(tag);
+      }
+      const t = document.createElement("time"); t.textContent = s.age;
+      btn.appendChild(t);
+      btn.addEventListener("mousedown", function (e) { e.preventDefault(); pick(s.sym); });
+      menu.appendChild(btn);
+    });
+    menu.classList.add("open");
+    syncHeight();
+  }
+
+  function updateMenu() {
+    const caret = input.selectionStart;
+    const before = input.value.slice(0, caret);
+    const m = before.match(/@([A-Za-z0-9.一-龥]*)$/);
+    if (!m) { closeMenu(); return; }
+    const q = m[1].toLowerCase();
+    mentionStart = caret - m[0].length;
+    items = stocks.filter(function (s) {
+      return s.sym.toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q);
+    });
+    if (!items.length) { closeMenu(); return; }
+    index = Math.min(index, items.length - 1);
+    renderMenu();
+  }
+
+  function pick(sym) {
+    const caret = input.selectionStart;
+    const before = input.value.slice(0, mentionStart);
+    const after = input.value.slice(caret);
+    input.value = before + "@" + sym + " " + after;
+    const pos = (before + "@" + sym + " ").length;
+    input.setSelectionRange(pos, pos);
+    closeMenu();
+    input.focus();
+  }
+
+  function submit() {
+    const text = input.value.trim();
+    if (!text || disabled) return;
+    input.value = "";
+    closeMenu();
+    setValue({ text: text, ts: Date.now() });
+  }
+
+  form.addEventListener("submit", function (e) { e.preventDefault(); submit(); });
+
+  input.addEventListener("input", function () { updateMenu(); syncHeight(); });
+  input.addEventListener("click", updateMenu);
+
+  input.addEventListener("keydown", function (e) {
+    if (menu.classList.contains("open")) {
+      if (e.key === "ArrowDown") { e.preventDefault(); index = (index + 1) % items.length; renderMenu(); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); index = (index - 1 + items.length) % items.length; renderMenu(); return; }
+      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(items[index].sym); return; }
+      if (e.key === "Escape") { closeMenu(); return; }
+    }
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  window.addEventListener("message", function (e) {
+    const data = e.data;
+    if (!data || data.type !== "streamlit:render") return;
+    const args = data.args || {};
+    stocks = args.stocks || [];
+    disabled = !!args.disabled;
+    input.placeholder = args.placeholder || "问我关于这些分析的任何问题…";
+    input.disabled = disabled;
+    send.disabled = disabled;
+    const th = args.theme || {};
+    const root = document.body.style;
+    root.setProperty("--surface", th.surface || "#141414");
+    root.setProperty("--text", th.text || "#f3f0f1");
+    root.setProperty("--muted", th.muted || "#a3a3a3");
+    root.setProperty("--subtle", th.subtle || "#8f8f8f");
+    root.setProperty("--border", th.border || "#262626");
+    root.setProperty("--border-strong", th.border_strong || "#3f3f46");
+    root.setProperty("--primary", th.primary || "#4edea3");
+    root.setProperty("--primary-text", th.primary_text || "#002113");
+    syncHeight();
+  });
+
+  post("streamlit:componentReady", { apiVersion: 1 });
+  setFrameHeight(BASE_H);
+})();
+</script>
+</body>
+</html>
