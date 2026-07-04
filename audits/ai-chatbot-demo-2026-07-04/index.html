@@ -3,17 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Trading24 AI Popup Chat Demo</title>
+  <title>Trading24 AI 轻量浮窗 Demo</title>
   <style>
     :root {
       color-scheme: dark;
       --bg: #0a0a0a;
       --surface: #111112;
-      --surface-low: #0f1111;
       --surface-high: #1f2020;
       --text: #f3f0f1;
-      --muted: #a3a3a3;
-      --subtle: #737373;
+      --muted: #a6a6a6;
+      --subtle: #8f8f8f;
       --border: #262626;
       --border-strong: #3f3f46;
       --primary: #4edea3;
@@ -21,24 +20,25 @@
       --danger: #ffb4ab;
       --warning: #f5b93f;
       --tertiary: #9699ff;
-      --shadow: 0 30px 90px rgba(0, 0, 0, .56);
+      --shadow: 0 24px 70px rgba(0, 0, 0, .55);
       --radius-card: 12px;
-      --radius-control: 12px;
       font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
     }
 
     * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
     body {
       margin: 0;
       min-height: 100vh;
       background: var(--bg);
       color: var(--text);
-      overflow: hidden;
     }
 
-    button, textarea { font: inherit; }
-    button { cursor: pointer; }
+    button, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; background: none; border: 0; padding: 0; }
 
+    /* ---------- 背景应用(总览页 / 分析页) ---------- */
     .ticker {
       height: 38px;
       display: flex;
@@ -50,596 +50,462 @@
       white-space: nowrap;
       overflow: hidden;
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 600;
       background: #070707;
     }
 
     .dashboard {
-      height: calc(100vh - 38px);
-      overflow: hidden;
-      padding: 34px max(34px, calc((100vw - 1600px) / 2 + 34px));
+      min-height: calc(100vh - 38px);
+      padding: 34px max(34px, calc((100vw - 1600px) / 2 + 34px)) 120px;
       background:
         radial-gradient(circle at 75% 30%, rgba(78, 222, 163, .05), transparent 26%),
         linear-gradient(180deg, #0d0d0d 0%, #080808 100%);
     }
 
-    .nav {
-      height: 56px;
-      display: flex;
-      align-items: center;
-      gap: 44px;
-      margin-bottom: 54px;
-    }
+    .nav { height: 56px; display: flex; align-items: center; gap: 44px; margin-bottom: 44px; }
+    .brand { color: var(--primary); font-size: 26px; font-weight: 800; margin-right: 44px; }
+    .nav a { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .nav a.active { color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 8px; }
 
-    .brand {
-      color: var(--primary);
-      font-size: 28px;
-      font-weight: 950;
-      margin-right: 52px;
-    }
-
-    .nav a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 800;
-    }
-
-    .nav a.active {
-      color: var(--primary);
-      border-bottom: 2px solid var(--primary);
-      padding-bottom: 8px;
-    }
-
-    .nav-tools {
-      margin-left: auto;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .tool-button {
-      width: 40px;
-      height: 40px;
-      border: 0;
-      border-radius: 10px;
-      background: transparent;
-      color: var(--muted);
-      font-weight: 900;
-    }
-
-    .search {
-      width: 240px;
-      height: 44px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      background: var(--surface);
-      font-weight: 800;
-    }
-
-    .title { margin-bottom: 28px; }
-    .title h1 {
-      margin: 0 0 8px;
-      font-size: 34px;
-      line-height: 1.12;
-      letter-spacing: 0;
-    }
-
-    .title p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 15px;
-      font-weight: 800;
-    }
-
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-      max-width: 1320px;
-      margin-bottom: 18px;
-    }
-
-    .stat, .card {
-      border: 1px solid var(--border);
-      background: rgba(31, 32, 32, .84);
-      border-radius: var(--radius-card);
-      box-shadow: 0 10px 28px rgba(0,0,0,.18);
-    }
-
-    .stat { padding: 16px; min-height: 104px; }
-    .label { color: var(--muted); font-size: 12px; font-weight: 900; margin-bottom: 12px; }
-    .value { font-size: 26px; font-weight: 950; }
-    .value small { font-size: 14px; color: var(--muted); }
-    .bar { height: 7px; background: #2a2a2a; border-radius: 99px; margin-top: 14px; overflow: hidden; max-width: 240px; }
-    .bar span { display: block; height: 100%; width: 68%; background: var(--primary); }
+    .title h1 { margin: 0 0 8px; font-size: 32px; line-height: 1.12; font-weight: 700; }
+    .title p { margin: 0 0 26px; color: var(--muted); font-size: 15px; }
 
     .cards {
       display: grid;
-      grid-template-columns: repeat(4, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 12px;
       max-width: 1320px;
     }
 
-    .card { padding: 16px; min-height: 196px; }
-    .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 10px; }
-    .card h3 { margin: 0; font-size: 17px; }
-    .badge { border: 1px solid currentColor; color: var(--primary); border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 900; white-space: nowrap; }
+    .card {
+      border: 1px solid var(--border);
+      background: rgba(31, 32, 32, .84);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      min-height: 150px;
+      cursor: pointer;
+      transition: border-color .15s ease, transform .15s ease;
+      text-align: left;
+    }
+    .card:hover { border-color: rgba(78, 222, 163, .5); transform: translateY(-2px); }
+
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .card h3 { margin: 0; font-size: 16px; font-weight: 700; }
+    .badge { border: 1px solid currentColor; color: var(--primary); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; }
     .badge.sell { color: var(--danger); }
     .badge.neutral { color: var(--muted); }
-    .price { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-weight: 900; margin: 8px 0 12px; }
-    .spark {
-      height: 26px;
-      border-radius: 4px;
-      background:
-        linear-gradient(140deg, transparent 0 13%, #656565 14% 16%, transparent 17% 28%, #656565 29% 31%, transparent 32% 44%, #656565 45% 47%, transparent 48% 61%, #656565 62% 64%, transparent 65% 100%);
-      opacity: .72;
-    }
-    .card p { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 12px 0 0; }
+    .price { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; margin: 6px 0 10px; }
+    .card p { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0; }
 
-    .page-dim {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, .08);
-      pointer-events: none;
-      z-index: 20;
+    /* 分析页 */
+    .back-link { color: var(--muted); font-size: 13px; margin-bottom: 20px; display: inline-block; }
+    .back-link:hover { color: var(--text); }
+    .analysis-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+    .analysis-head h1 { margin: 0; font-size: 30px; font-weight: 700; }
+    .analysis-meta { color: var(--muted); font-size: 14px; margin-bottom: 26px; }
+    .report {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 12px;
+      max-width: 1100px;
     }
+    .report .card { cursor: default; min-height: 120px; }
+    .report .card:hover { transform: none; border-color: var(--border); }
+    .report h4 { margin: 0 0 8px; font-size: 13px; color: var(--subtle); font-weight: 700; letter-spacing: .04em; }
+    .report .run-meta { color: var(--subtle); font-size: 12px; margin-top: 10px; }
 
+    /* ---------- AI 浮窗 ---------- */
     .ai-launcher {
       position: fixed;
-      right: 22px;
-      bottom: 22px;
-      z-index: 45;
+      right: 20px;
+      bottom: 20px;
+      z-index: 60;
       width: 54px;
       height: 54px;
-      border: 0;
       border-radius: 18px;
       background: var(--primary);
       color: var(--primary-text);
-      font-weight: 950;
+      font-weight: 800;
+      font-size: 16px;
       box-shadow: 0 14px 36px rgba(78, 222, 163, .24);
+      transition: transform .15s ease;
     }
+    .ai-launcher:hover { transform: scale(1.05); }
 
     .chat-popup {
       position: fixed;
-      right: 22px;
-      bottom: 88px;
-      z-index: 50;
-      width: min(980px, calc(100vw - 44px));
-      height: min(760px, calc(100vh - 126px));
-      min-height: 560px;
+      right: 20px;
+      bottom: 86px;
+      z-index: 70;
+      width: min(420px, calc(100vw - 32px));
+      height: auto;
+      min-height: 320px;
+      max-height: min(680px, calc(100vh - 118px));
       display: grid;
-      grid-template-columns: 222px minmax(0, 1fr) 228px;
-      background: #0b0b0c;
+      grid-template-rows: auto minmax(0, 1fr);
+      background: #0d0e0e;
       border: 1px solid var(--border-strong);
-      border-radius: 18px;
+      border-radius: 16px;
       box-shadow: var(--shadow);
       overflow: hidden;
     }
 
-    .popup-threadbar {
-      border-right: 1px solid var(--border);
-      background: #0f1010;
-      min-height: 0;
-      display: grid;
-      grid-template-rows: auto 1fr;
-    }
+    .popup-header { grid-row: 1; }
+    .threads-view, .chat-view { grid-row: 2; }
 
-    .threadbar-head {
-      padding: 18px 16px 14px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .threadbar-head h2 {
-      margin: 0 0 12px;
-      font-size: 17px;
-      letter-spacing: 0;
-    }
-
-    .new-chat {
-      width: 100%;
-      height: 40px;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius-control);
-      background: var(--primary);
-      color: var(--primary-text);
-      font-weight: 950;
-    }
-
-    .thread-list {
-      padding: 10px;
-      display: grid;
-      gap: 8px;
-      align-content: start;
-      overflow: auto;
-    }
-
-    .thread-card, .context-card {
-      border: 1px solid var(--border);
-      background: rgba(31, 32, 32, .84);
-      border-radius: var(--radius-card);
-    }
-
-    .thread-card {
-      padding: 11px;
-      text-align: left;
-      color: var(--text);
-      transition: border-color .18s ease, background .18s ease;
-    }
-
-    .thread-card.active,
-    .thread-card:hover {
-      border-color: rgba(78, 222, 163, .58);
-      background: rgba(78, 222, 163, .08);
-    }
-
-    .thread-title { font-weight: 950; font-size: 12.5px; margin-bottom: 5px; }
-    .thread-meta { color: var(--muted); font-size: 11.5px; line-height: 1.35; }
-
-    .chat-main {
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      min-width: 0;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    .chat-header {
-      height: 68px;
-      border-bottom: 1px solid var(--border);
+    /* 头部 */
+    .popup-header {
       display: flex;
       align-items: center;
-      padding: 0 18px;
-      gap: 12px;
+      gap: 10px;
+      padding: 12px 12px 10px;
+      border-bottom: 1px solid var(--border);
       background: rgba(15, 16, 16, .98);
     }
 
-    .avatar {
-      width: 38px;
-      height: 38px;
+    .icon-button {
+      flex: 0 0 auto;
+      width: 36px;
+      height: 36px;
       border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 15px;
       display: grid;
       place-items: center;
-      background: var(--primary);
-      color: var(--primary-text);
-      font-weight: 950;
-      flex: 0 0 auto;
     }
+    .icon-button:hover { border-color: var(--border-strong); }
 
-    .chat-title { min-width: 0; }
+    .chat-title { min-width: 0; flex: 1; }
     .chat-title h2 {
       margin: 0;
-      font-size: 15px;
-      letter-spacing: 0;
+      font-size: 14.5px;
+      font-weight: 700;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
 
-    .chat-title p {
-      margin: 3px 0 0;
-      color: var(--muted);
-      font-size: 11.5px;
-      font-weight: 800;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .header-actions {
-      margin-left: auto;
-      display: flex;
-      gap: 8px;
-    }
-
-    .icon-button {
-      width: 34px;
-      height: 34px;
-      border-radius: 9px;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text);
-      font-weight: 950;
-    }
-
-    .messages {
-      min-height: 0;
-      overflow: auto;
-      padding: 22px clamp(16px, 3vw, 34px) 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      background:
-        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
-      background-size: 34px 34px;
-    }
-
-    .day-divider {
-      align-self: center;
-      color: var(--subtle);
-      font-size: 12px;
-      font-weight: 900;
-      border: 1px solid var(--border);
-      background: rgba(17,17,18,.9);
-      border-radius: 999px;
-      padding: 6px 12px;
-    }
-
-    .message {
-      display: grid;
-      grid-template-columns: 34px minmax(0, 640px);
-      gap: 11px;
-      align-items: start;
-    }
-
-    .message.user {
-      align-self: flex-end;
-      grid-template-columns: minmax(0, 520px) 34px;
-    }
-
-    .mini-avatar {
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      background: var(--surface-high);
-      color: var(--muted);
-      font-weight: 950;
-      font-size: 12px;
-    }
-
-    .user .mini-avatar {
-      background: rgba(78, 222, 163, .16);
-      color: var(--primary);
-    }
-
-    .bubble {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      background: #151616;
-      padding: 13px 14px;
-      line-height: 1.6;
-      font-size: 13.5px;
-      box-shadow: 0 12px 24px rgba(0,0,0,.16);
-    }
-
-    .user .bubble {
-      background: #122319;
-      border-color: rgba(78, 222, 163, .28);
-    }
-
-    .sources {
-      margin-top: 11px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .source-chip {
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 6px 9px;
-      color: var(--muted);
-      background: rgba(255,255,255,.03);
-      font-size: 11.5px;
-      font-weight: 900;
-    }
-
-    .decision-row {
-      display: grid;
-      grid-template-columns: 78px 1fr auto;
-      gap: 10px;
+    .scope-chip {
+      margin-top: 4px;
+      display: inline-flex;
       align-items: center;
-      margin-top: 12px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-      font-size: 12.5px;
-    }
-
-    .risk-meter {
-      height: 8px;
-      background: #272727;
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .risk-meter span {
-      display: block;
-      height: 100%;
-      width: 72%;
-      background: linear-gradient(90deg, var(--primary), var(--warning), var(--danger));
-    }
-
-    .composer {
-      border-top: 1px solid var(--border);
-      padding: 12px 14px 14px;
-      background: rgba(15,16,16,.98);
-    }
-
-    .quick-actions {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 9px;
-    }
-
-    .quick-actions button {
-      flex: 0 0 auto;
-      height: 32px;
+      gap: 5px;
+      max-width: 100%;
       border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--muted);
+      background: rgba(78, 222, 163, .08);
+      color: var(--primary);
       border-radius: 999px;
-      padding: 0 11px;
+      padding: 3px 9px;
       font-size: 11.5px;
-      font-weight: 900;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+    .scope-chip:hover { border-color: rgba(78, 222, 163, .5); }
 
-    .composer-box {
+    /* 范围面板:悬浮在头部下方,不挤压聊天区 */
+    .scope-panel {
+      position: absolute;
+      left: 10px;
+      right: 10px;
+      z-index: 8;
       border: 1px solid var(--border-strong);
-      border-radius: 14px;
-      background: #141414;
-      padding: 10px;
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: end;
-    }
-
-    textarea {
-      min-height: 56px;
-      max-height: 132px;
-      resize: vertical;
-      width: 100%;
-      border: 0;
-      outline: 0;
-      background: transparent;
-      color: var(--text);
-      line-height: 1.5;
-    }
-
-    textarea::placeholder { color: var(--subtle); }
-
-    .send {
-      width: 42px;
-      height: 42px;
-      border: 0;
-      border-radius: 12px;
-      background: var(--primary);
-      color: var(--primary-text);
-      font-weight: 950;
-    }
-
-    .context-panel {
-      border-left: 1px solid var(--border);
-      background: #0f1010;
-      min-width: 0;
+      border-radius: 13px;
+      background: #101211;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+      padding: 12px;
+      max-height: calc(100% - 170px);
       overflow: auto;
-      padding: 16px;
-    }
-
-    .context-panel h3 {
-      margin: 0 0 12px;
-      font-size: 14px;
     }
 
     .scope-toggle {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px;
-      margin-bottom: 12px;
       padding: 4px;
-      border-radius: 12px;
+      border-radius: 11px;
       background: #151616;
       border: 1px solid var(--border);
-    }
-
-    .scope-toggle button {
-      height: 32px;
-      border: 0;
-      border-radius: 9px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 11.5px;
-      font-weight: 950;
-    }
-
-    .scope-toggle button.active {
-      background: var(--primary);
-      color: var(--primary-text);
-    }
-
-    .context-card {
-      padding: 12px;
       margin-bottom: 10px;
     }
-
-    .context-card strong {
-      display: block;
+    .scope-toggle button {
+      height: 34px;
+      border-radius: 8px;
+      color: var(--muted);
       font-size: 12.5px;
-      margin-bottom: 6px;
+      font-weight: 700;
     }
+    .scope-toggle button.active { background: var(--primary); color: var(--primary-text); }
 
-    .context-card p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 11.5px;
-      line-height: 1.45;
-    }
+    .scope-hint { color: var(--subtle); font-size: 12px; line-height: 1.45; margin: 0 0 10px; }
 
-    .mini-table {
-      display: grid;
-      gap: 8px;
-    }
-
-    .mini-row {
-      display: grid;
-      grid-template-columns: 48px 1fr auto;
-      gap: 8px;
+    .stock-list { display: grid; gap: 6px; }
+    .stock-row {
+      display: flex;
       align-items: center;
-      font-size: 11.5px;
-      color: var(--muted);
+      gap: 10px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: rgba(31, 32, 32, .7);
+      padding: 8px 10px;
+      font-size: 12.5px;
     }
+    .stock-row input { accent-color: var(--primary); width: 15px; height: 15px; flex: 0 0 auto; }
+    .stock-row .sym { font-weight: 700; width: 76px; flex: 0 0 auto; }
+    .stock-row .decision { color: var(--muted); flex: 1; }
+    .stock-row .decision.buy { color: var(--primary); }
+    .stock-row .decision.sell { color: var(--danger); }
+    .stock-row time { color: var(--subtle); font-size: 11.5px; }
+    .stock-row.disabled { opacity: .55; }
 
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 99px;
+    /* 会话列表视图 */
+    .threads-view { min-height: 0; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+    .new-chat {
+      height: 42px;
+      border: 1px solid var(--border-strong);
+      border-radius: 11px;
       background: var(--primary);
-      display: inline-block;
-      margin-right: 6px;
+      color: var(--primary-text);
+      font-weight: 700;
+      flex: 0 0 auto;
     }
 
-    .dot.sell { background: var(--danger); }
+    .thread-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      background: rgba(31, 32, 32, .84);
+      border-radius: var(--radius-card);
+      padding: 11px 12px;
+      cursor: pointer;
+      transition: border-color .15s ease, background .15s ease;
+    }
+    .thread-item:hover, .thread-item.active {
+      border-color: rgba(78, 222, 163, .55);
+      background: rgba(78, 222, 163, .07);
+    }
+    .thread-item .info { flex: 1; min-width: 0; }
+    .thread-item .t { font-weight: 700; font-size: 13px; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .thread-item .m { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .thread-del {
+      flex: 0 0 auto;
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      color: var(--subtle);
+      font-size: 15px;
+      display: grid; place-items: center;
+    }
+    .thread-del:hover { color: var(--danger); background: rgba(255, 180, 171, .1); }
 
-    .empty-note {
+    .threads-foot { margin-top: auto; text-align: center; padding-top: 8px; }
+    .threads-foot button { color: var(--subtle); font-size: 11.5px; text-decoration: underline; }
+    .threads-foot button:hover { color: var(--muted); }
+
+    /* 聊天视图 */
+    .chat-view { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+
+    .messages {
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px 14px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .day-divider, .sys-note {
+      align-self: center;
       color: var(--subtle);
       font-size: 11.5px;
-      line-height: 1.45;
-      padding: 10px 0;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: rgba(17, 17, 18, .9);
+      border-radius: 999px;
+      padding: 5px 12px;
+      text-align: center;
+    }
+    .sys-note { color: var(--primary); border-color: rgba(78, 222, 163, .3); }
+
+    .message { display: flex; }
+    .message .bubble {
+      max-width: 88%;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      background: #161717;
+      padding: 11px 13px;
+      line-height: 1.6;
+      font-size: 13.5px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .message.user { justify-content: flex-end; }
+    .message.user .bubble {
+      background: #122319;
+      border-color: rgba(78, 222, 163, .3);
     }
 
-    @media (max-width: 1180px) {
-      .chat-popup {
-        grid-template-columns: 198px minmax(0, 1fr);
-        width: min(820px, calc(100vw - 34px));
-      }
-      .context-panel { display: none; }
+    .sources { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .source-chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, .03);
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .source-chip:hover { border-color: var(--border-strong); color: var(--text); }
+    .source-chip.bg { color: var(--tertiary); border-color: rgba(150, 153, 255, .35); }
+
+    .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+    .typing i {
+      width: 6px; height: 6px; border-radius: 99px;
+      background: var(--subtle);
+      animation: blink 1.1s infinite;
+    }
+    .typing i:nth-child(2) { animation-delay: .18s; }
+    .typing i:nth-child(3) { animation-delay: .36s; }
+    @keyframes blink { 0%, 70%, 100% { opacity: .25; } 32% { opacity: 1; } }
+
+    /* 引用详情浮层 */
+    .source-popover {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: calc(100% + 8px);
+      z-index: 6;
+      border: 1px solid var(--border-strong);
+      border-radius: 13px;
+      background: #131414;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+      padding: 13px 14px;
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+    .source-popover h4 { margin: 0 0 6px; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
+    .source-popover h4 button { color: var(--subtle); font-size: 14px; }
+    .source-popover .meta { color: var(--subtle); font-size: 11.5px; margin-bottom: 8px; }
+    .source-popover p { margin: 0; color: var(--muted); }
+
+    /* @ 引用菜单 */
+    .mention-menu {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: calc(100% + 8px);
+      z-index: 7;
+      border: 1px solid var(--border-strong);
+      border-radius: 13px;
+      background: #131414;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+      overflow: hidden;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+    .mention-menu .head {
+      padding: 8px 12px;
+      color: var(--subtle);
+      font-size: 11.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .mention-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      font-size: 12.5px;
+      text-align: left;
+    }
+    .mention-item .sym { font-weight: 700; width: 84px; flex: 0 0 auto; }
+    .mention-item .name { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mention-item time { color: var(--subtle); font-size: 11px; }
+    .mention-item .tag {
+      flex: 0 0 auto;
+      color: var(--primary);
+      border: 1px solid rgba(78, 222, 163, .35);
+      border-radius: 999px;
+      padding: 1px 7px;
+      font-size: 10.5px;
+      font-weight: 600;
+    }
+    .mention-item.selected, .mention-item:hover { background: rgba(78, 222, 163, .1); }
+
+    /* 输入区 */
+    .composer {
+      border-top: 1px solid var(--border);
+      padding: 10px 12px 12px;
+      background: rgba(15, 16, 16, .98);
+      position: relative;
     }
 
-    @media (max-width: 780px) {
-      body { overflow: auto; }
-      .dashboard {
-        min-height: calc(100vh - 38px);
-        height: auto;
-        padding: 24px 14px 120px;
-      }
-      .nav { gap: 18px; margin-bottom: 34px; }
-      .brand { font-size: 22px; margin-right: auto; }
-      .search, .nav-tools { display: none; }
-      .stats, .cards { grid-template-columns: 1fr; }
+    .quick-actions { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+    .quick-actions::-webkit-scrollbar { display: none; }
+    .quick-actions button {
+      flex: 0 0 auto;
+      height: 34px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .quick-actions button:hover { color: var(--text); border-color: var(--border-strong); }
+
+    .composer-box {
+      border: 1px solid var(--border-strong);
+      border-radius: 13px;
+      background: #141414;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: end;
+    }
+
+    textarea {
+      min-height: 40px;
+      max-height: 110px;
+      resize: none;
+      width: 100%;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      line-height: 1.5;
+      font-size: 13.5px;
+      padding: 6px 4px;
+    }
+    textarea::placeholder { color: var(--subtle); }
+
+    .send {
+      width: 40px;
+      height: 40px;
+      border-radius: 11px;
+      background: var(--primary);
+      color: var(--primary-text);
+      font-weight: 800;
+      font-size: 16px;
+    }
+    .send:disabled { opacity: .4; cursor: default; }
+
+    @media (max-width: 560px) {
       .chat-popup {
-        inset: 10px;
+        right: 10px;
+        left: 10px;
+        bottom: 82px;
         width: auto;
-        height: auto;
-        min-height: 0;
-        grid-template-columns: 1fr;
-        border-radius: 16px;
+        max-height: calc(100vh - 100px);
       }
-      .popup-threadbar { display: none; }
-      .chat-header { height: 64px; padding: 0 14px; }
-      .messages { padding: 18px 14px; }
-      .message, .message.user { grid-template-columns: 1fr; }
-      .mini-avatar { display: none; }
-      .decision-row { grid-template-columns: 1fr; }
-      .composer { padding: 10px; }
-      .ai-launcher { display: none; }
+      .dashboard { padding: 24px 14px 120px; }
+      .nav { gap: 18px; margin-bottom: 30px; }
+      .brand { margin-right: auto; }
     }
   </style>
 </head>
@@ -652,246 +518,723 @@
     <span>Scheduler: Next run 08:30</span>
   </div>
 
-  <main class="dashboard" aria-label="Trading24 dashboard preview">
+  <main class="dashboard" aria-label="Trading24 preview">
     <nav class="nav">
       <div class="brand">TRADING24</div>
-      <a class="active" href="#">总览</a>
-      <a href="#">分析</a>
-      <a href="#">关注</a>
-      <div class="nav-tools">
-        <button class="tool-button" title="设置">⚙</button>
-        <button class="tool-button" title="主题">☼</button>
-        <div class="search">搜索代码...</div>
-      </div>
+      <a id="navOverview" class="active">总览</a>
+      <a id="navAnalysis">分析</a>
+      <a>关注</a>
     </nav>
 
-    <section class="title">
-      <h1>关注列表总览</h1>
-      <p>基于每日智能体分析的高优先级标的。</p>
+    <section id="pageDashboard">
+      <div class="title">
+        <h1>关注列表总览</h1>
+        <p>点击任意股票卡片进入分析页 —— AI 助手会自动跟随页面切换上下文。</p>
+      </div>
+      <div class="cards" id="cards"></div>
     </section>
 
-    <section class="stats">
-      <div class="stat">
-        <div class="label">今日运行 · 待运行</div>
-        <div class="value">3 <small>/ 6 已完成</small></div>
-        <div class="bar"><span></span></div>
+    <section id="pageAnalysis" hidden>
+      <a class="back-link" id="backLink">‹ 返回总览</a>
+      <div class="analysis-head">
+        <h1 id="anaName"></h1>
+        <span class="badge" id="anaBadge"></span>
       </div>
-      <div class="stat">
-        <div class="label">今日决策分布</div>
-        <div class="value">1 <small>增持</small></div>
+      <p class="analysis-meta" id="anaMeta"></p>
+      <div class="report">
+        <article class="card"><h4>最终决策</h4><p id="anaView"></p><div class="run-meta" id="anaRun"></div></article>
+        <article class="card"><h4>技术面</h4><p id="anaTech"></p></article>
+        <article class="card"><h4>风险评估</h4><p id="anaRisk"></p></article>
       </div>
-      <div class="stat">
-        <div class="label">近期提醒</div>
-        <div class="value">3 <small>条 · 最新 TSLA 减持</small></div>
-      </div>
-    </section>
-
-    <section class="cards">
-      <article class="card">
-        <div class="card-head"><h3>美光科技</h3><span class="badge">增持</span></div>
-        <div class="price"><span>MU · NASDAQ</span><span>$975.56 -5.49%</span></div>
-        <div class="spark"></div>
-        <p>基本面被极端错杀，等待 900-950 区间缩量企稳后首笔建仓。</p>
-      </article>
-      <article class="card">
-        <div class="card-head"><h3>小米集团-W</h3><span class="badge sell">减持</span></div>
-        <div class="price"><span>1810.HK · HKEX</span><span>HK$22.60 +4.44%</span></div>
-        <div class="spark"></div>
-        <p>汽车业务亏损仍未收窄，建议持仓减至原仓位的 30%-50%。</p>
-      </article>
-      <article class="card">
-        <div class="card-head"><h3>特斯拉</h3><span class="badge sell">减持</span></div>
-        <div class="price"><span>TSLA · NASDAQ</span><span>$393.45 -7.49%</span></div>
-        <div class="spark"></div>
-        <p>反弹至 400-420 美元阻力区时减仓，止损设在 450 美元。</p>
-      </article>
-      <article class="card">
-        <div class="card-head"><h3>腾讯</h3><span class="badge neutral">中性</span></div>
-        <div class="price"><span>0700.HK · HKEX</span><span>HK$425.20 +1.19%</span></div>
-        <div class="spark"></div>
-        <p>维持现有仓位，广告增长抵消游戏业务短期波动。</p>
-      </article>
     </section>
   </main>
 
-  <div class="page-dim" aria-hidden="true"></div>
-  <button class="ai-launcher" title="AI 助手">AI</button>
+  <button class="ai-launcher" id="launcher" aria-label="打开 AI 助手" aria-expanded="false">AI</button>
 
-  <section class="chat-popup" aria-label="AI assistant popup">
-    <aside class="popup-threadbar">
-      <div class="threadbar-head">
-        <h2>AI 助手</h2>
-        <button class="new-chat" id="newChat">新对话</button>
+  <section class="chat-popup" id="popup" hidden aria-label="AI assistant popup">
+    <header class="popup-header">
+      <button class="icon-button" id="btnThreads" title="会话列表">☰</button>
+      <div class="chat-title">
+        <h2 id="chatTitle">AI 助手</h2>
+        <button class="scope-chip" id="scopeChip" title="点击调整上下文范围">上下文 ▾</button>
       </div>
-      <div class="thread-list">
-        <button class="thread-card active" data-thread="overview">
-          <div class="thread-title">今日关注列表复盘</div>
-          <div class="thread-meta">全部关注列表 · 6 只 · 刚刚</div>
-        </button>
-        <button class="thread-card" data-thread="nvda">
-          <div class="thread-title">NVDA 阻力位和仓位</div>
-          <div class="thread-meta">英伟达 · 最近成功记录</div>
-        </button>
-        <button class="thread-card" data-thread="risk">
-          <div class="thread-title">组合风险排序</div>
-          <div class="thread-meta">TSLA / 1810.HK / NVDA</div>
-        </button>
-        <button class="thread-card" data-thread="mu">
-          <div class="thread-title">MU 为什么还增持</div>
-          <div class="thread-meta">基本面 vs 技术面分歧</div>
-        </button>
+      <button class="icon-button" id="btnClose" title="关闭 (Esc)">×</button>
+    </header>
+
+    <div class="scope-panel" id="scopePanel" hidden>
+      <div class="scope-toggle">
+        <button id="scopePage">跟随页面</button>
+        <button id="scopeManual">手动选择</button>
       </div>
-    </aside>
+      <p class="scope-hint" id="scopeHint"></p>
+      <div class="stock-list" id="stockList"></div>
+    </div>
 
-    <section class="chat-main">
-      <header class="chat-header">
-        <div class="avatar">AI</div>
-        <div class="chat-title">
-          <h2>今日关注列表复盘</h2>
-          <p>弹窗模式 · 全部关注列表 · 6 只 · 使用最新成功记录</p>
-        </div>
-        <div class="header-actions" aria-label="chat actions">
-          <button class="icon-button" title="上下文">≡</button>
-          <button class="icon-button" title="关闭">×</button>
-        </div>
-      </header>
+    <div class="threads-view" id="viewThreads" hidden>
+      <button class="new-chat" id="newChat">＋ 新对话</button>
+      <div id="threadList" style="display:contents"></div>
+      <div class="threads-foot"><button id="resetDemo">重置演示数据</button></div>
+    </div>
 
-      <div class="messages" id="messages">
-        <div class="day-divider">今天 00:22</div>
-        <div class="message">
-          <div class="mini-avatar">AI</div>
-          <div class="bubble">
-            我已经读取了今天关注列表的最新分析。这个版本仍然是页面上的弹窗，但内部结构更接近聊天软件：左侧会话、中间消息流、右侧上下文。
-            <div class="sources">
-              <span class="source-chip">MU · 13h ago</span>
-              <span class="source-chip">NVDA · 5h ago</span>
-              <span class="source-chip">TSLA · Just now</span>
-            </div>
-          </div>
-        </div>
-        <div class="message user">
-          <div class="bubble">今天最该关注哪只？为什么？</div>
-          <div class="mini-avatar">你</div>
-        </div>
-        <div class="message">
-          <div class="mini-avatar">AI</div>
-          <div class="bubble">
-            今天最值得优先盯的是 <strong>TSLA</strong>。它不是机会最高，而是事件风险和技术破位风险最高。当前建议是把反弹区间 400-420 美元当作减仓窗口，450 美元上方才说明空头判断失效。
-            <div class="decision-row">
-              <strong>风险压力</strong>
-              <div class="risk-meter"><span></span></div>
-              <span>高</span>
-            </div>
-            <div class="sources">
-              <span class="source-chip">最终决策 · TSLA</span>
-              <span class="source-chip">技术面 · RSI / MACD</span>
-              <span class="source-chip">风险复核</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div class="chat-view" id="viewChat">
+      <div class="messages" id="messages"></div>
       <form class="composer" id="chatForm">
-        <div class="quick-actions">
-          <button type="button" data-prompt="这些标的里谁的风险最高？">谁风险最高？</button>
+        <div class="source-popover" id="sourcePopover" hidden></div>
+        <div class="mention-menu" id="mentionMenu" hidden></div>
+        <div class="quick-actions" id="quickActions">
+          <button type="button" data-prompt="这些标的里谁的风险最高?">谁风险最高?</button>
           <button type="button" data-prompt="把各只的决策和理由汇总成一段">汇总成一段</button>
-          <button type="button" data-prompt="NVDA 现在应该减到多少仓位？">追问 NVDA</button>
-          <button type="button" data-prompt="MU 为什么技术面很差还维持增持？">解释分歧</button>
+          <button type="button" data-prompt="现在应该怎么调整仓位?">仓位建议</button>
         </div>
         <div class="composer-box">
-          <textarea id="prompt" placeholder="问我关于这些分析的任何问题..."></textarea>
-          <button class="send" type="submit" title="发送">↑</button>
+          <textarea id="prompt" rows="1" placeholder="问我任何问题,输入 @ 可引用其他标的数据..."></textarea>
+          <button class="send" id="sendBtn" type="submit" title="发送 (Enter)">↑</button>
         </div>
       </form>
-    </section>
-
-    <aside class="context-panel">
-      <h3>上下文</h3>
-      <div class="scope-toggle">
-        <button class="active">自动</button>
-        <button>手动选择</button>
-      </div>
-      <div class="context-card">
-        <strong>当前范围</strong>
-        <p>全部关注列表 · 6 只股票 · 每只使用最近一条成功分析记录。</p>
-      </div>
-      <div class="context-card">
-        <strong>决策分布</strong>
-        <div class="mini-table">
-          <div class="mini-row"><span><i class="dot"></i>MU</span><span>增持</span><strong>13h</strong></div>
-          <div class="mini-row"><span><i class="dot sell"></i>TSLA</span><span>减持</span><strong>now</strong></div>
-          <div class="mini-row"><span><i class="dot sell"></i>NVDA</span><span>减持</span><strong>5h</strong></div>
-          <div class="mini-row"><span>0700.HK</span><span>中性</span><strong>3d</strong></div>
-        </div>
-      </div>
-      <div class="context-card">
-        <strong>弹窗式聊天改造</strong>
-        <p>载体仍是页面浮层；打开时不改变仪表盘布局；输入区固定底部；上下文放在弹窗内部。</p>
-      </div>
-      <div class="empty-note">正式接入时，这里显示引用 run_id、报告段落、价格快照和手动选择记录。</div>
-    </aside>
+    </div>
   </section>
 
   <script>
-    const messages = document.querySelector("#messages");
-    const prompt = document.querySelector("#prompt");
-    const form = document.querySelector("#chatForm");
-    const quickActions = document.querySelectorAll("[data-prompt]");
-    const threads = document.querySelectorAll(".thread-card");
-    const newChat = document.querySelector("#newChat");
+    "use strict";
 
-    const replies = [
-      "从当前记录看，风险最高的是 TSLA，其次是小米和 NVDA。TSLA 的问题是反弹接近阻力区，但基本面事件仍未释放。",
-      "一句话总结：MU 是基本面便宜但需要等技术面企稳；TSLA 和小米偏减仓防守；NVDA 反弹到阻力位时降低仓位；腾讯维持中性观察。",
-      "如果只看 NVDA，当前更像减到基准权重的 60%-70%，等待 199-203 美元阻力区是否有效突破。",
-      "MU 的核心分歧是：基本面估值和现金流很强，但短线技术面显著恶化，所以只适合等缩量企稳后分批建仓。"
-    ];
+    /* ================= Mock 数据:最近一次成功分析 ================= */
+    const STOCKS = {
+      "MU": { name: "美光科技", market: "NASDAQ", decision: "增持", cls: "buy", risk: 2, riskLabel: "中",
+        time: "13 小时前", mins: 780, runId: "run-0704-mu-3161", price: "$975.56 (-5.49%)",
+        view: "基本面被极端错杀,HBM 订单与现金流都强;等待 900-950 美元区间缩量企稳后分批建仓,首笔不超过目标仓位的 1/3。",
+        tech: "短线技术面显著恶化,连续放量下跌后 RSI 进入超卖区,尚未出现缩量企稳信号。",
+        riskNote: "存储周期波动风险为主,基本面风险有限;主要风险是左侧接刀过早。" },
+      "TSLA": { name: "特斯拉", market: "NASDAQ", decision: "减持", cls: "sell", risk: 5, riskLabel: "高",
+        time: "刚刚", mins: 0, runId: "run-0704-tsla-3177", price: "$393.45 (-7.49%)",
+        view: "把反弹区间 400-420 美元当作减仓窗口,450 美元上方才说明空头判断失效,止损设在 450 美元。",
+        tech: "RSI 34,MACD 死叉未修复;393 美元贴近前低,反弹动能弱,破位风险高。",
+        riskNote: "事件风险与技术破位风险都是关注列表里最高的,风险等级:高。" },
+      "NVDA": { name: "英伟达", market: "NASDAQ", decision: "减持", cls: "sell", risk: 3, riskLabel: "中高",
+        time: "5 小时前", mins: 300, runId: "run-0704-nvda-3169", price: "$194.83 (-1.39%)",
+        view: "建议把仓位降到基准权重的 60%-70%,观察 199-203 美元阻力区能否有效突破;若放量站稳再回补。",
+        tech: "价格贴近 199-203 美元阻力区下沿,量能萎缩,突破前不宜加仓。",
+        riskNote: "估值与拥挤度偏高,但基本面无恶化;风险等级:中高。" },
+      "1810.HK": { name: "小米集团-W", market: "HKEX", decision: "减持", cls: "sell", risk: 4, riskLabel: "高",
+        time: "2 小时前", mins: 120, runId: "run-0704-1810-3172", price: "HK$22.60 (+4.44%)",
+        view: "今天的反弹更像情绪修复而非基本面反转;建议持仓减至原仓位的 30%-50%。",
+        tech: "单日 +4.44% 放量反弹,但仍处于下降通道内,上方 HK$24.5 压力明显。",
+        riskNote: "汽车业务亏损仍未收窄,交付爬坡不及预期是核心风险;风险等级:高。" },
+      "0700.HK": { name: "腾讯控股", market: "HKEX", decision: "中性", cls: "neutral", risk: 1, riskLabel: "低",
+        time: "3 天前", mins: 4320, runId: "run-0701-0700-2988", price: "HK$425.20 (+1.19%)",
+        view: "维持现有仓位,广告增长抵消游戏业务的短期波动,等待下一份财报再决定加减。",
+        tech: "在 HK$410-430 区间震荡,趋势中性,无明显方向信号。",
+        riskNote: "监管与游戏流水波动为主要变量,当前风险等级:低。" },
+      "600519.SS": { name: "贵州茅台", market: "SSE", decision: "观察", cls: "neutral", risk: 1, riskLabel: "低",
+        time: "1 天前", mins: 1440, runId: "run-0703-600519-3101", price: "¥1,185.70 (-0.77%)",
+        view: "批价企稳但需求端仍偏弱,暂不建仓;若跌破 ¥1,150 再评估左侧机会。",
+        tech: "缩量阴跌,¥1,150 是关键支撑;量价背离尚未出现反转信号。",
+        riskNote: "消费复苏节奏是核心变量,持仓风险低但机会成本存在;风险等级:低。" }
+    };
+    const ALL_SYMS = Object.keys(STOCKS);
 
-    function addMessage(role, text) {
+    const KEYWORDS = {
+      "TSLA": ["tsla", "特斯拉"],
+      "NVDA": ["nvda", "英伟达"],
+      "MU": ["mu", "美光"],
+      "1810.HK": ["1810", "小米"],
+      "0700.HK": ["0700", "腾讯"],
+      "600519.SS": ["600519", "茅台", "贵州"]
+    };
+
+    /* ================= 状态与持久化 ================= */
+    const STORE_KEY = "t24.ai.demo.v3";
+    let currentPage = { type: "dashboard", sym: null };
+
+    function srcOf(sym, bg) {
+      const s = STOCKS[sym];
+      return { sym, label: (bg ? "@ " : "") + sym + " · " + s.decision, bg: !!bg };
+    }
+
+    function seedState() {
+      return {
+        activeId: "th-overview",
+        threads: [
+          { id: "th-overview", title: "今日关注列表复盘", scope: { mode: "page" }, messages: [
+            { role: "assistant", text: "今天关注列表:1 增持、3 减持、2 中性观察,最优先盯 TSLA。我的上下文默认跟随页面;输入 @ 可引用其他标的数据。",
+              sources: [srcOf("TSLA"), srcOf("MU"), srcOf("NVDA")] }
+          ] },
+          { id: "th-risk", title: "组合风险排序", scope: { mode: "manual", syms: ["TSLA", "1810.HK", "NVDA"] }, messages: [
+            { role: "user", text: "这三只按风险排个序" },
+            { role: "assistant", text: "风险从高到低:TSLA(高) > 小米 1810.HK(高) > NVDA(中高)。TSLA 排第一是因为事件风险未释放且价格贴近破位区。", sources: [srcOf("TSLA"), srcOf("1810.HK"), srcOf("NVDA")] }
+          ] }
+        ]
+      };
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORE_KEY);
+        if (raw) { const st = JSON.parse(raw); if (st && Array.isArray(st.threads) && st.threads.length) return st; }
+      } catch (e) { /* 损坏则重置 */ }
+      return seedState();
+    }
+
+    let state = loadState();
+    const save = () => localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    const activeThread = () => state.threads.find(t => t.id === state.activeId) || state.threads[0];
+
+    function scopeSyms(t) {
+      if (t.scope.mode === "manual") return t.scope.syms;
+      return currentPage.sym ? [currentPage.sym] : ALL_SYMS;
+    }
+
+    function scopeLabel(t) {
+      if (t.scope.mode === "manual") return "手动 · " + t.scope.syms.length + " 只";
+      return currentPage.sym ? "跟随页面 · " + currentPage.sym : "跟随页面 · 全部 " + ALL_SYMS.length + " 只";
+    }
+
+    /* ================= 回复引擎 ================= */
+    function detectSymbols(text) {
+      const hits = [];
+      for (const [sym, words] of Object.entries(KEYWORDS)) {
+        const hit = words.some(w => /^[a-z0-9]+$/.test(w)
+          ? new RegExp("(^|[^a-z0-9])" + w + "($|[^a-z0-9])", "i").test(text)
+          : text.includes(w));
+        if (hit) hits.push(sym);
+      }
+      return hits;
+    }
+
+    function parseMentions(text) {
+      const found = [];
+      for (const sym of ALL_SYMS) {
+        const s = STOCKS[sym];
+        if (text.toLowerCase().includes(("@" + sym).toLowerCase()) || text.includes("@" + s.name)) found.push(sym);
+      }
+      return found;
+    }
+
+    function describe(sym) {
+      const s = STOCKS[sym];
+      return s.name + "(" + sym + ")当前决策是「" + s.decision + "」,风险等级" + s.riskLabel + "。" + s.view;
+    }
+
+    function generateReply(text, thread) {
+      const scope = scopeSyms(thread);
+      const mentions = parseMentions(text);
+      const ctx = Array.from(new Set(scope.concat(mentions)));
+      if (ctx.length === 0) {
+        return { text: "当前会话的上下文范围是空的——在顶部范围面板勾选标的,或输入 @ 引用某只股票的数据。", sources: [] };
+      }
+
+      const referenced = detectSymbols(text);
+      // 问"对比/比较"时,把整个上下文都拉进比较
+      const compare = /对比|比较|谁更/.test(text) && ctx.length <= 4;
+      const inCtx = compare ? ctx.slice() : referenced.filter(s => ctx.includes(s));
+      const outCtx = referenced.filter(s => !ctx.includes(s));
+      const bgMentions = mentions.filter(s => !scope.includes(s));
+      const sources = [];
+      const parts = [];
+
+      if (bgMentions.length) {
+        parts.push("已把 " + bgMentions.map(s => STOCKS[s].name + "(" + s + ")").join("、") + " 的最新分析作为背景加入本次回答。");
+        bgMentions.forEach(s => sources.push(srcOf(s, true)));
+      }
+
+      if (inCtx.length) {
+        inCtx.forEach(sym => {
+          parts.push(describe(sym));
+          if (!sources.some(x => x.sym === sym)) sources.push(srcOf(sym));
+        });
+        if (inCtx.length > 1) {
+          const ranked = inCtx.slice().sort((a, b) => STOCKS[b].risk - STOCKS[a].risk);
+          parts.push("两相对比:风险更高的是 " + STOCKS[ranked[0]].name + "(" + ranked[0] + "),优先处理它的仓位。");
+        }
+      }
+
+      if (outCtx.length) {
+        parts.push("注意:" + outCtx.map(s => STOCKS[s].name + "(" + s + ")").join("、") + " 不在当前上下文内,我没有引用它的分析——可以输入 @" + outCtx[0] + " 把它加进来。");
+      }
+
+      if (!inCtx.length) {
+        if (/风险|危险/.test(text)) {
+          const ranked = ctx.slice().sort((a, b) => STOCKS[b].risk - STOCKS[a].risk);
+          const top = ranked[0];
+          parts.push("当前上下文内风险从高到低:" + ranked.map(s => s + "(" + STOCKS[s].riskLabel + ")").join(" > ") + "。");
+          parts.push("最需要警惕的是 " + STOCKS[top].name + ":" + STOCKS[top].riskNote);
+          ranked.slice(0, 3).forEach(s => { if (!sources.some(x => x.sym === s)) sources.push(srcOf(s)); });
+        } else if (/汇总|总结|一段|概览|梳理/.test(text)) {
+          parts.push("一段话汇总当前上下文(" + ctx.length + " 只):" + ctx.map(s => STOCKS[s].name + "「" + STOCKS[s].decision + "」—" + STOCKS[s].view.split(",")[0]).join(";") + "。");
+          ctx.forEach(s => { if (!sources.some(x => x.sym === s)) sources.push(srcOf(s)); });
+        } else if (/仓位|加仓|减仓|建仓|买|卖/.test(text)) {
+          const act = ctx.filter(s => STOCKS[s].cls !== "neutral");
+          if (act.length) {
+            parts.push("当前上下文内需要动仓位的是:" + act.map(s => STOCKS[s].name + "(" + STOCKS[s].decision + ")").join("、") + "。");
+            act.forEach(s => { parts.push("· " + STOCKS[s].name + ":" + STOCKS[s].view); if (!sources.some(x => x.sym === s)) sources.push(srcOf(s)); });
+          } else {
+            parts.push("当前上下文内的标的都是中性/观察,暂时不需要调整仓位。");
+          }
+        } else if (/技术面|均线|支撑|阻力|k线|走势/i.test(text)) {
+          ctx.slice(0, 3).forEach(s => { parts.push(STOCKS[s].name + " 技术面:" + STOCKS[s].tech); if (!sources.some(x => x.sym === s)) sources.push(srcOf(s)); });
+        } else if (ctx.length === 1) {
+          parts.push(describe(ctx[0]));
+          parts.push("技术面:" + STOCKS[ctx[0]].tech);
+          if (!sources.some(x => x.sym === ctx[0])) sources.push(srcOf(ctx[0]));
+        } else {
+          const buy = ctx.filter(s => STOCKS[s].cls === "buy").length;
+          const sell = ctx.filter(s => STOCKS[s].cls === "sell").length;
+          const top = ctx.slice().sort((a, b) => STOCKS[b].risk - STOCKS[a].risk)[0];
+          parts.push("当前上下文共 " + ctx.length + " 只:" + buy + " 增持、" + sell + " 减持、" + (ctx.length - buy - sell) + " 中性/观察。风险最高的是 " + STOCKS[top].name + "(" + top + ")。可以直接问某只股票、风险排序、仓位建议,或让我汇总成一段。");
+          if (!sources.some(x => x.sym === top)) sources.push(srcOf(top));
+        }
+      }
+
+      return { text: parts.join("\n\n"), sources };
+    }
+
+    /* ================= DOM 引用 ================= */
+    const $ = (id) => document.getElementById(id);
+    const launcher = $("launcher"), popup = $("popup");
+    const btnThreads = $("btnThreads"), btnClose = $("btnClose");
+    const chatTitle = $("chatTitle"), scopeChip = $("scopeChip");
+    const scopePanel = $("scopePanel"), scopePage = $("scopePage"), scopeManual = $("scopeManual");
+    const scopeHint = $("scopeHint"), stockList = $("stockList");
+    const viewThreads = $("viewThreads"), viewChat = $("viewChat"), threadList = $("threadList");
+    const messagesEl = $("messages"), form = $("chatForm"), promptEl = $("prompt"), sendBtn = $("sendBtn");
+    const sourcePopover = $("sourcePopover"), mentionMenu = $("mentionMenu");
+
+    let generating = false;
+
+    /* ================= 页面切换(总览 / 分析页) ================= */
+    function showPage(type, sym) {
+      currentPage = { type, sym: sym || null };
+      $("pageDashboard").hidden = type !== "dashboard";
+      $("pageAnalysis").hidden = type !== "analysis";
+      $("navOverview").classList.toggle("active", type === "dashboard");
+      $("navAnalysis").classList.toggle("active", type === "analysis");
+
+      if (type === "analysis") {
+        const s = STOCKS[sym];
+        $("anaName").textContent = s.name + "(" + sym + ")";
+        const badge = $("anaBadge");
+        badge.textContent = s.decision;
+        badge.className = "badge " + (s.cls === "buy" ? "" : s.cls);
+        $("anaMeta").textContent = sym + " · " + s.market + " · " + s.price + " · 最近分析 " + s.time;
+        $("anaView").textContent = s.view;
+        $("anaRun").textContent = "引用 " + s.runId + " · " + s.time;
+        $("anaTech").textContent = s.tech;
+        $("anaRisk").textContent = s.riskNote;
+      }
+
+      // 弹窗开着且会话在"跟随页面"模式 → 提示上下文已切换
+      if (!popup.hidden) {
+        const t = activeThread();
+        if (t.scope.mode === "page") {
+          const last = t.messages[t.messages.length - 1];
+          const note = "上下文已跟随页面:" + (sym ? STOCKS[sym].name + " 分析页" : "全部关注列表");
+          if (!(last && last.role === "system" && last.text === note)) {
+            t.messages.push({ role: "system", text: note });
+            save();
+            renderMessages();
+          }
+        }
+        renderHeader();
+        renderScopePanel();
+      }
+    }
+
+    $("navOverview").addEventListener("click", () => showPage("dashboard"));
+    $("navAnalysis").addEventListener("click", () => showPage("analysis", currentPage.sym || "TSLA"));
+    $("backLink").addEventListener("click", () => showPage("dashboard"));
+
+    /* ================= 渲染 ================= */
+    function renderCards() {
+      const box = $("cards");
+      box.innerHTML = "";
+      ALL_SYMS.forEach(sym => {
+        const s = STOCKS[sym];
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "card";
+        card.innerHTML =
+          '<div class="card-head"><h3></h3><span class="badge ' + (s.cls === "buy" ? "" : s.cls) + '"></span></div>' +
+          '<div class="price"><span></span><span></span></div><p></p>';
+        card.querySelector("h3").textContent = s.name;
+        card.querySelector(".badge").textContent = s.decision;
+        card.querySelectorAll(".price span")[0].textContent = sym + " · " + s.market;
+        card.querySelectorAll(".price span")[1].textContent = s.price;
+        card.querySelector("p").textContent = s.view;
+        card.addEventListener("click", () => showPage("analysis", sym));
+        box.appendChild(card);
+      });
+    }
+
+    function renderHeader() {
+      const t = activeThread();
+      chatTitle.textContent = t.title;
+      scopeChip.textContent = scopeLabel(t) + " ▾";
+    }
+
+    function renderScopePanel() {
+      const t = activeThread();
+      const page = t.scope.mode === "page";
+      scopePage.classList.toggle("active", page);
+      scopeManual.classList.toggle("active", !page);
+      scopeHint.textContent = page
+        ? (currentPage.sym
+            ? "跟随页面:当前在 " + STOCKS[currentPage.sym].name + " 分析页,只引用它的最新分析;回到总览则引用全部关注列表。"
+            : "跟随页面:当前在总览页,引用全部关注列表 " + ALL_SYMS.length + " 只的最新分析。")
+        : "手动模式:只引用勾选的股票。无论页面怎么切换,范围保持不变。";
+      const effective = scopeSyms(t);
+      stockList.innerHTML = "";
+      ALL_SYMS.forEach(sym => {
+        const s = STOCKS[sym];
+        const row = document.createElement("label");
+        row.className = "stock-row" + (page ? " disabled" : "");
+        row.innerHTML = '<input type="checkbox"><span class="sym"></span><span class="decision ' + s.cls + '"></span><time></time>';
+        const input = row.querySelector("input");
+        input.dataset.sym = sym;
+        input.checked = effective.includes(sym);
+        input.disabled = page;
+        row.querySelector(".sym").textContent = sym;
+        row.querySelector(".decision").textContent = s.name + " · " + s.decision;
+        row.querySelector("time").textContent = s.time;
+        stockList.appendChild(row);
+      });
+    }
+
+    function sourcesNode(sources) {
+      const box = document.createElement("div");
+      box.className = "sources";
+      sources.forEach(src => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "source-chip" + (src.bg ? " bg" : "");
+        chip.textContent = src.label;
+        chip.addEventListener("click", (e) => { e.stopPropagation(); showSource(src); });
+        box.appendChild(chip);
+      });
+      return box;
+    }
+
+    function messageNode(msg) {
+      if (msg.role === "system") {
+        const note = document.createElement("div");
+        note.className = "sys-note";
+        note.textContent = msg.text;
+        return note;
+      }
       const wrap = document.createElement("div");
-      wrap.className = role === "user" ? "message user" : "message";
+      wrap.className = "message" + (msg.role === "user" ? " user" : "");
       const bubble = document.createElement("div");
       bubble.className = "bubble";
-      bubble.textContent = text;
-      const avatar = document.createElement("div");
-      avatar.className = "mini-avatar";
-      avatar.textContent = role === "user" ? "你" : "AI";
-      if (role === "user") wrap.append(bubble, avatar);
-      else wrap.append(avatar, bubble);
-      messages.appendChild(wrap);
-      messages.scrollTop = messages.scrollHeight;
+      bubble.textContent = msg.text;
+      if (msg.sources && msg.sources.length) bubble.appendChild(sourcesNode(msg.sources));
+      wrap.appendChild(bubble);
+      return wrap;
+    }
+
+    function renderMessages() {
+      const t = activeThread();
+      messagesEl.innerHTML = "";
+      const divider = document.createElement("div");
+      divider.className = "day-divider";
+      divider.textContent = "今天 · " + t.title;
+      messagesEl.appendChild(divider);
+      t.messages.forEach(m => messagesEl.appendChild(messageNode(m)));
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function renderThreads() {
+      threadList.innerHTML = "";
+      state.threads.forEach(t => {
+        const item = document.createElement("div");
+        item.className = "thread-item" + (t.id === state.activeId ? " active" : "");
+        const lastChat = t.messages.filter(m => m.role !== "system").slice(-1)[0];
+        item.innerHTML = '<div class="info"><div class="t"></div><div class="m"></div></div>';
+        item.querySelector(".t").textContent = t.title;
+        item.querySelector(".m").textContent = scopeLabel(t) + " · " + t.messages.length + " 条 · " + (lastChat ? lastChat.text.slice(0, 24) : "空会话");
+        const del = document.createElement("button");
+        del.className = "thread-del";
+        del.title = "删除会话";
+        del.textContent = "×";
+        del.addEventListener("click", (e) => { e.stopPropagation(); deleteThread(t.id); });
+        item.appendChild(del);
+        item.addEventListener("click", () => switchThread(t.id));
+        threadList.appendChild(item);
+      });
+    }
+
+    function renderAll() { renderHeader(); renderMessages(); renderThreads(); renderScopePanel(); }
+
+    /* ================= 开合 ================= */
+    function setOpen(open) {
+      popup.hidden = !open;
+      launcher.textContent = open ? "×" : "AI";
+      launcher.setAttribute("aria-expanded", String(open));
+      if (open) { showChatView(); renderAll(); promptEl.focus(); }
+    }
+
+    launcher.addEventListener("click", () => setOpen(popup.hidden));
+    btnClose.addEventListener("click", () => setOpen(false));
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || popup.hidden) return;
+      if (!mentionMenu.hidden) { closeMentionMenu(); return; }
+      if (!sourcePopover.hidden) { sourcePopover.hidden = true; return; }
+      if (!scopePanel.hidden) { scopePanel.hidden = true; return; }
+      if (!viewThreads.hidden) { showChatView(); return; }
+      setOpen(false);
+    });
+
+    /* ================= 视图切换 ================= */
+    function showChatView() {
+      viewThreads.hidden = true;
+      viewChat.hidden = false;
+      btnThreads.textContent = "☰";
+      btnThreads.title = "会话列表";
+    }
+    function showThreadsView() {
+      renderThreads();
+      viewThreads.hidden = false;
+      viewChat.hidden = true;
+      scopePanel.hidden = true;
+      btnThreads.textContent = "‹";
+      btnThreads.title = "返回对话";
+    }
+    btnThreads.addEventListener("click", () => { viewThreads.hidden ? showThreadsView() : showChatView(); });
+
+    /* ================= 范围面板 ================= */
+    scopeChip.addEventListener("click", () => {
+      scopePanel.hidden = !scopePanel.hidden;
+      if (!scopePanel.hidden) {
+        scopePanel.style.top = (document.querySelector(".popup-header").offsetHeight + 8) + "px";
+        renderScopePanel();
+      }
+    });
+
+    scopePage.addEventListener("click", () => {
+      activeThread().scope = { mode: "page" };
+      save(); renderHeader(); renderScopePanel();
+    });
+
+    scopeManual.addEventListener("click", () => {
+      const t = activeThread();
+      if (t.scope.mode !== "manual") t.scope = { mode: "manual", syms: scopeSyms(t).slice() };
+      save(); renderHeader(); renderScopePanel();
+    });
+
+    stockList.addEventListener("change", (e) => {
+      const sym = e.target.dataset && e.target.dataset.sym;
+      if (!sym) return;
+      const t = activeThread();
+      if (t.scope.mode !== "manual") return;
+      t.scope.syms = e.target.checked ? t.scope.syms.concat(sym) : t.scope.syms.filter(s => s !== sym);
+      save(); renderHeader();
+    });
+
+    /* ================= 会话管理 ================= */
+    function switchThread(id) {
+      state.activeId = id;
+      save();
+      showChatView();
+      renderAll();
+      promptEl.focus();
+    }
+
+    let newCount = 0;
+    $("newChat").addEventListener("click", () => {
+      newCount += 1;
+      const id = "th-" + Date.now() + "-" + newCount;
+      const where = currentPage.sym ? STOCKS[currentPage.sym].name + " 分析页,默认只关联它" : "总览页,默认关联全部关注列表";
+      state.threads.unshift({ id, title: "新对话", scope: { mode: "page" }, messages: [
+        { role: "assistant", text: "新对话已创建。你现在在" + where + ";输入 @ 可以引用其他标的的数据作为背景。", sources: [] }
+      ] });
+      switchThread(id);
+    });
+
+    function deleteThread(id) {
+      state.threads = state.threads.filter(t => t.id !== id);
+      if (!state.threads.length) state.threads = seedState().threads;
+      if (state.activeId === id) state.activeId = state.threads[0].id;
+      save(); renderThreads(); renderHeader();
+    }
+
+    $("resetDemo").addEventListener("click", () => {
+      localStorage.removeItem(STORE_KEY);
+      state = seedState();
+      save(); showChatView(); renderAll();
+    });
+
+    /* ================= 引用详情 ================= */
+    function showSource(src) {
+      const s = STOCKS[src.sym];
+      sourcePopover.innerHTML = "";
+      const h = document.createElement("h4");
+      h.textContent = s.name + "(" + src.sym + ")· " + s.decision + (src.bg ? " · @ 背景引用" : "");
+      const x = document.createElement("button");
+      x.type = "button"; x.textContent = "×";
+      x.addEventListener("click", () => { sourcePopover.hidden = true; });
+      h.appendChild(x);
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = "引用 " + s.runId + " · " + s.time + " · " + s.price;
+      const p = document.createElement("p");
+      p.textContent = s.view + " 正式版中这里可跳转到完整分析报告。";
+      sourcePopover.append(h, meta, p);
+      sourcePopover.hidden = false;
+    }
+
+    document.addEventListener("click", (e) => {
+      if (!sourcePopover.hidden && !sourcePopover.contains(e.target) && !e.target.closest(".source-chip")) {
+        sourcePopover.hidden = true;
+      }
+      if (!mentionMenu.hidden && !mentionMenu.contains(e.target) && e.target !== promptEl) {
+        closeMentionMenu();
+      }
+      if (!scopePanel.hidden && !scopePanel.contains(e.target) && !e.target.closest("#scopeChip")) {
+        scopePanel.hidden = true;
+      }
+    });
+
+    /* ================= @ 引用菜单 ================= */
+    let mentionItems = [];
+    let mentionIndex = 0;
+    let mentionStart = -1; // "@" 在文本中的位置
+
+    function closeMentionMenu() {
+      mentionMenu.hidden = true;
+      mentionItems = [];
+      mentionStart = -1;
+    }
+
+    function updateMentionMenu() {
+      const caret = promptEl.selectionStart;
+      const before = promptEl.value.slice(0, caret);
+      const m = before.match(/@([A-Za-z0-9.一-龥]*)$/);
+      if (!m) { closeMentionMenu(); return; }
+      const query = m[1].toLowerCase();
+      mentionStart = caret - m[0].length;
+      const scope = scopeSyms(activeThread());
+      // 排序:当前页面标的 > 当前范围内 > 其余;组内按分析时间从新到旧
+      const rank = (sym) => sym === currentPage.sym ? 0 : (scope.includes(sym) ? 1 : 2);
+      mentionItems = ALL_SYMS
+        .filter(sym => sym.toLowerCase().includes(query) || STOCKS[sym].name.toLowerCase().includes(query))
+        .sort((a, b) => rank(a) - rank(b) || STOCKS[a].mins - STOCKS[b].mins);
+      if (!mentionItems.length) { closeMentionMenu(); return; }
+      mentionIndex = Math.min(mentionIndex, mentionItems.length - 1);
+      renderMentionMenu();
+    }
+
+    function renderMentionMenu() {
+      const scope = scopeSyms(activeThread());
+      mentionMenu.innerHTML = '<div class="head">引用标的数据作为背景(↑↓ 选择,Enter 确认)</div>';
+      mentionItems.forEach((sym, i) => {
+        const s = STOCKS[sym];
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mention-item" + (i === mentionIndex ? " selected" : "");
+        btn.innerHTML = '<span class="sym"></span><span class="name"></span><time></time>';
+        btn.querySelector(".sym").textContent = sym;
+        btn.querySelector(".name").textContent = s.name + " · " + s.decision;
+        if (sym === currentPage.sym || scope.includes(sym)) {
+          const tag = document.createElement("span");
+          tag.className = "tag";
+          tag.textContent = sym === currentPage.sym ? "本页" : "范围内";
+          btn.insertBefore(tag, btn.querySelector("time"));
+        }
+        btn.querySelector("time").textContent = s.time;
+        btn.addEventListener("click", () => pickMention(sym));
+        mentionMenu.appendChild(btn);
+      });
+      mentionMenu.hidden = false;
+    }
+
+    function pickMention(sym) {
+      const caret = promptEl.selectionStart;
+      const before = promptEl.value.slice(0, mentionStart);
+      const after = promptEl.value.slice(caret);
+      promptEl.value = before + "@" + sym + " " + after;
+      const pos = (before + "@" + sym + " ").length;
+      promptEl.setSelectionRange(pos, pos);
+      closeMentionMenu();
+      promptEl.focus();
+    }
+
+    promptEl.addEventListener("input", updateMentionMenu);
+    promptEl.addEventListener("click", updateMentionMenu);
+
+    /* ================= 发送与流式回复 ================= */
+    function setGenerating(v) {
+      generating = v;
+      sendBtn.disabled = v;
+      promptEl.placeholder = v ? "AI 正在回复..." : "问我任何问题,输入 @ 可引用其他标的数据...";
+    }
+
+    function streamReply(reply, thread) {
+      const wrap = document.createElement("div");
+      wrap.className = "message";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+      wrap.appendChild(bubble);
+      messagesEl.appendChild(wrap);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      window.setTimeout(() => {
+        bubble.textContent = "";
+        // 按经过时间推进,后台节流定时器也能保证播完
+        const duration = Math.min(300 + reply.text.length * 12, 2600);
+        const start = performance.now();
+        const timer = window.setInterval(() => {
+          const progress = Math.min((performance.now() - start) / duration, 1);
+          bubble.textContent = reply.text.slice(0, Math.ceil(progress * reply.text.length));
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+          if (progress >= 1) {
+            window.clearInterval(timer);
+            if (reply.sources.length) bubble.appendChild(sourcesNode(reply.sources));
+            thread.messages.push({ role: "assistant", text: reply.text, sources: reply.sources });
+            save();
+            setGenerating(false);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+        }, 30);
+      }, 400);
     }
 
     function submitPrompt(value) {
       const text = value.trim();
-      if (!text) return;
-      addMessage("user", text);
-      prompt.value = "";
-      window.setTimeout(() => addMessage("assistant", replies[Math.floor(Math.random() * replies.length)]), 360);
+      if (!text || generating) return;
+      closeMentionMenu();
+      const t = activeThread();
+      t.messages.push({ role: "user", text });
+      if (t.title === "新对话") { t.title = text.slice(0, 14) + (text.length > 14 ? "…" : ""); renderHeader(); }
+      save();
+      messagesEl.appendChild(messageNode({ role: "user", text }));
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      promptEl.value = "";
+      setGenerating(true);
+      streamReply(generateReply(text, t), t);
     }
 
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      submitPrompt(prompt.value);
+    form.addEventListener("submit", (e) => { e.preventDefault(); submitPrompt(promptEl.value); });
+
+    promptEl.addEventListener("keydown", (e) => {
+      if (!mentionMenu.hidden) {
+        if (e.key === "ArrowDown") { e.preventDefault(); mentionIndex = (mentionIndex + 1) % mentionItems.length; renderMentionMenu(); return; }
+        if (e.key === "ArrowUp") { e.preventDefault(); mentionIndex = (mentionIndex - 1 + mentionItems.length) % mentionItems.length; renderMentionMenu(); return; }
+        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pickMention(mentionItems[mentionIndex]); return; }
+        if (e.key === "Escape") { closeMentionMenu(); return; }
+      }
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        submitPrompt(promptEl.value);
+      }
     });
 
-    quickActions.forEach((button) => {
-      button.addEventListener("click", () => submitPrompt(button.dataset.prompt || ""));
+    $("quickActions").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-prompt]");
+      if (btn) submitPrompt(btn.dataset.prompt);
     });
 
-    threads.forEach((thread) => {
-      thread.addEventListener("click", () => {
-        threads.forEach((item) => item.classList.remove("active"));
-        thread.classList.add("active");
-        addMessage("assistant", `已切换到「${thread.querySelector(".thread-title").textContent}」。正式版本会加载这条会话的历史消息和上下文。`);
-      });
-    });
-
-    newChat.addEventListener("click", () => {
-      messages.innerHTML = '<div class="day-divider">新对话</div>';
-      addMessage("assistant", "新对话已创建。弹窗仍停留在当前页面上，不会改变仪表盘布局。");
-      prompt.focus();
-    });
+    /* ================= 启动 ================= */
+    renderCards();
+    renderAll();
   </script>
 </body>
 </html>
