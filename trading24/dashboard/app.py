@@ -1993,6 +1993,28 @@ button[data-testid^="stBaseButton"]:focus-visible {
         .st-key-t24_ai_streaming :is(p, li) {
             font-size: 13px !important; line-height: 1.55 !important; margin: .25em 0 !important;
         }
+        /* 生成期间的输入框占位壳 */
+        .t24-ai-composer-ghost {
+            border: 1px solid var(--t24-border-strong);
+            border-radius: 12px;
+            padding: 15px 12px;
+            color: var(--t24-subtle);
+            font-size: 13px;
+            background: var(--t24-surface);
+        }
+        /* 系统提示(上下文切换等) */
+        .t24-ai-sysnote {
+            align-self: center;
+            text-align: center;
+            color: var(--t24-muted);
+            font-size: 11px;
+            border: 1px solid var(--t24-border);
+            background: color-mix(in srgb, var(--t24-primary) 6%, transparent);
+            border-radius: 999px;
+            padding: 4px 12px;
+            margin: 4px auto;
+            width: fit-content;
+        }
         /* 消息里的引用 chips */
         .t24-ai-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
         .t24-ai-chip {
@@ -2313,8 +2335,12 @@ if "ai_selected_run_ids" not in st.session_state:
     # 「发给 AI」入口的交接位：面板打开时转成一条带固定记录的会话
     st.session_state.ai_selected_run_ids = []
 if "ai_threads" not in st.session_state:
-    # 会话模型：[{id, title, scope_mode: page|manual, scope_syms, run_override, messages}]
-    st.session_state.ai_threads = []
+    # 会话模型：[{id, title, pinned_syms, excluded_syms, run_override, messages}]
+    # 持久化在 SQLite ai_threads 表,整页刷新/重开浏览器不丢
+    try:
+        st.session_state.ai_threads = db.get_ai_threads(conn)
+    except Exception:  # noqa: BLE001
+        st.session_state.ai_threads = []
 if "ai_active_thread" not in st.session_state:
     st.session_state.ai_active_thread = None
 if "ai_view" not in st.session_state:
@@ -2323,8 +2349,6 @@ if "ai_pending" not in st.session_state:
     st.session_state.ai_pending = None  # 待流式回答的提问
 if "ai_composer_ts" not in st.session_state:
     st.session_state.ai_composer_ts = 0  # composer 组件提交去重
-if "ai_thread_seq" not in st.session_state:
-    st.session_state.ai_thread_seq = 0
 if "ai_scope_open" not in st.session_state:
     st.session_state.ai_scope_open = False
 if "search_nonce" not in st.session_state:
@@ -2422,7 +2446,7 @@ def selected_ai_runs(run_ids: list[int]):
     return runs
 
 
-def report_context_for_run(run) -> str:
+def report_context_for_run(run, full: bool = True) -> str:
     lines = [
         f"## {names.get(run.ticker, run.ticker)} · {run.ticker} · {run.trade_date} · {run_display_no(run)}",
         f"- 状态：{status_label(run.status)}",
@@ -2431,6 +2455,13 @@ def report_context_for_run(run) -> str:
         f"- 摘要：{conclusion(run.id or 0)}",
         "",
     ]
+    if not full:
+        # 精简版：只带最终决策段，控制多标的场景的 token 体积
+        reps = {r.section: (r.content or "").strip() for r in db.get_reports(conn, run.id or 0)}
+        final = reps.get("final") or reps.get("trader") or ""
+        if final:
+            lines.extend([f"### {SEC['final']}", final, ""])
+        return "\n".join(lines).strip()
     reports = db.get_reports(conn, run.id or 0)
     section_order = ["final", "market", "sentiment", "news", "fundamentals", "bull", "bear",
                      "research_mgr", "trader", "risk"]
@@ -2443,11 +2474,17 @@ def report_context_for_run(run) -> str:
     return "\n".join(lines).strip()
 
 
-def build_ai_context(run_ids: list[int]) -> str:
+def build_ai_context(run_ids: list[int], focus_syms: list[str] | None = None) -> str:
+    """拼接上下文。≤2 条记录时全文；更多时只有 focus（本页/@ 引用）标的给全文，其余给精简版。"""
     runs = selected_ai_runs(run_ids)
     if not runs:
         return ""
-    return "\n\n---\n\n".join(report_context_for_run(run) for run in runs)
+    focus = set(focus_syms or [])
+    give_full_to_all = len(runs) <= 2
+    return "\n\n---\n\n".join(
+        report_context_for_run(run, full=give_full_to_all or run.ticker in focus)
+        for run in runs
+    )
 
 
 def _ai_chat_request(prompt: str, context_text: str, history: list | None):
@@ -3951,16 +3988,23 @@ def manage():
     else:
         _render_watchlist_rows(rt, tickers)
 
+def _save_ai_thread(thread) -> None:
+    """落库；失败不打断对话（下次成功保存会补上）。"""
+    try:
+        thread["id"] = db.upsert_ai_thread(conn, thread)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _new_ai_thread(title: str = "新对话", run_override: list[int] | None = None):
-    st.session_state.ai_thread_seq += 1
     thread = {
-        "id": st.session_state.ai_thread_seq,
         "title": title,
         "pinned_syms": [],          # @ 引用后钉进会话的标的，对后续轮次持续生效
         "excluded_syms": [],        # 从跟随页面基础范围移除的标的
         "run_override": [int(x) for x in (run_override or [])],  # 「发给 AI」固定记录
         "messages": [],
     }
+    thread["id"] = db.upsert_ai_thread(conn, thread)
     st.session_state.ai_threads.insert(0, thread)
     st.session_state.ai_active_thread = thread["id"]
     st.session_state.ai_view = "chat"
@@ -4078,21 +4122,58 @@ def _queue_ai(prompt: str, thread) -> None:
             thread["excluded_syms"] = [x for x in thread["excluded_syms"] if x != s]
             if s not in current:
                 mention_labels.append(f"@ {names.get(s, s)}")
+    if not _set_ai_pending(prompt, thread):
+        return
+    thread["messages"].append({"role": "user", "content": prompt, "attachments": mention_labels})
+    if thread["title"] == "新对话":
+        thread["title"] = prompt[:14] + ("…" if len(prompt) > 14 else "")
+    _save_ai_thread(thread)
+
+
+def _set_ai_pending(prompt: str, thread) -> bool:
+    """计算本轮上下文并标记 pending。上下文为空时写入提示消息并返回 False。"""
     run_ids = thread_run_ids(thread)
     if not run_ids:
         thread["messages"].append({
             "role": "assistant", "ok": False, "attachments": [],
             "content": "还没有可用的分析记录。先在关注列表跑一次分析，我就能基于结果回答了。"})
-        return
+        _save_ai_thread(thread)
+        return False
+    detail = st.session_state.get("detail")
+    focus = [s for s in _parse_ai_mentions(prompt) if s in symbols]
+    if detail and detail in symbols and detail not in focus:
+        focus.append(detail)
+    focus.extend(s for s in thread.get("pinned_syms") or [] if s not in focus)
     labels = [full_run_label(r) for r in selected_ai_runs(run_ids)]
-    thread["messages"].append({"role": "user", "content": prompt, "attachments": mention_labels})
-    if thread["title"] == "新对话":
-        thread["title"] = prompt[:14] + ("…" if len(prompt) > 14 else "")
     st.session_state.ai_pending = {"thread_id": thread["id"], "prompt": prompt,
-                                   "run_ids": run_ids, "labels": labels}
+                                   "run_ids": run_ids, "labels": labels,
+                                   "focus_syms": focus}
+    return True
+
+
+def _note_page_switch(thread) -> None:
+    """跟随页面的会话在页面切换时插入一条系统提示，让上下文变化可见。"""
+    if thread.get("run_override"):
+        return
+    cur = st.session_state.get("detail")
+    cur = cur if cur in symbols else None
+    if "_page" not in thread:
+        thread["_page"] = cur
+        return
+    if thread["_page"] == cur:
+        return
+    thread["_page"] = cur
+    if thread["messages"]:
+        label = names.get(cur, cur) if cur else f"全部关注列表 {len(symbols)} 只"
+        thread["messages"].append({"role": "system", "content": f"上下文已跟随页面切换：{label}"})
+        _save_ai_thread(thread)
 
 
 def _render_ai_message(msg) -> None:
+    if msg["role"] == "system":
+        st.markdown(f"<div class='t24-ai-sysnote'>{html_safe(msg['content'])}</div>",
+                    unsafe_allow_html=True)
+        return
     role_label = "你" if msg["role"] == "user" else "AI"
     css_role = "user" if msg["role"] == "user" else "assistant"
     body = (html_safe(msg["content"]).replace(chr(10), "<br>") if msg["role"] == "user"
@@ -4127,6 +4208,10 @@ def _render_ai_threads_view() -> None:
             st.session_state.ai_threads = [x for x in st.session_state.ai_threads if x["id"] != t["id"]]
             if st.session_state.ai_active_thread == t["id"]:
                 st.session_state.ai_active_thread = None
+            try:
+                db.delete_ai_thread(conn, int(t["id"]))
+            except Exception:  # noqa: BLE001
+                pass
             st.rerun()
 
 
@@ -4144,6 +4229,7 @@ def _render_ai_scope_section(thread) -> None:
                 st.caption(f"· {full_run_label(r)}")
             if st.button("清除，改用自动范围", key=f"ai_clear_override_{thread['id']}", width="stretch"):
                 thread["run_override"] = []
+                _save_ai_thread(thread)
                 st.rerun()
             return
         detail = st.session_state.get("detail")
@@ -4162,12 +4248,14 @@ def _render_ai_scope_section(thread) -> None:
                     thread["pinned_syms"] = [x for x in thread["pinned_syms"] if x != s]
                 else:
                     thread["excluded_syms"].append(s)
+                _save_ai_thread(thread)
                 st.rerun()
         removed = [s for s in thread["excluded_syms"] if s in base]
         if removed:
             st.caption("已移除：" + "、".join(names.get(s, s) for s in removed))
             if st.button("全部恢复", key=f"ai_ctx_restore_{thread['id']}", width="stretch"):
                 thread["excluded_syms"] = []
+                _save_ai_thread(thread)
                 st.rerun()
         if not effective:
             st.caption("上下文为空——恢复移除项，或在输入框用 @ 添加标的。")
@@ -4175,12 +4263,17 @@ def _render_ai_scope_section(thread) -> None:
 
 def _stream_pending_answer(thread, pending) -> None:
     """流式生成回答并落库到会话消息。"""
-    history = thread["messages"][:-1]  # 刚追加的用户消息不算历史
+    # 历史截到最近 12 条（约 6 轮），控制多轮对话的 token 体积；system 提示不进历史
+    history = [m for m in thread["messages"][:-1] if m.get("role") in ("user", "assistant")][-12:]
     status = {"ok": True}
 
     def _gen():
         try:
-            yield from stream_ai(pending["prompt"], build_ai_context(pending["run_ids"]), history)
+            yield from stream_ai(
+                pending["prompt"],
+                build_ai_context(pending["run_ids"], pending.get("focus_syms")),
+                history,
+            )
         except RuntimeError as exc:
             status["ok"] = False
             yield str(exc)
@@ -4188,7 +4281,10 @@ def _stream_pending_answer(thread, pending) -> None:
             status["ok"] = False
             yield f"AI 请求失败：{type(exc).__name__}。请检查模型密钥、网络和 settings.yaml 的模型配置。"
 
-    with st.container(key="t24_ai_streaming"):
+    # 先占位:流式气泡 + 灰置的输入框壳,避免生成期间输入区消失导致跳动
+    stream_box = st.container(key="t24_ai_streaming")
+    st.markdown("<div class='t24-ai-composer-ghost'>AI 正在回复…</div>", unsafe_allow_html=True)
+    with stream_box:
         st.markdown("<div class='t24-ai-meta'>AI</div>", unsafe_allow_html=True)
         full = st.write_stream(_gen)
     if isinstance(full, list):
@@ -4197,8 +4293,9 @@ def _stream_pending_answer(thread, pending) -> None:
         "role": "assistant", "content": str(full or "").strip(), "ok": status["ok"],
         "attachments": pending.get("labels", [])[:3],
     })
-    # 不主动 rerun:流式内容已在屏上,下一次交互时自然并入历史消息
     st.session_state.ai_pending = None
+    _save_ai_thread(thread)
+    st.rerun()
 
 
 def render_ai_plugin():
@@ -4249,6 +4346,9 @@ def render_ai_plugin():
         with st.container(key="t24_ai_scope_row"):
             _render_ai_scope_section(thread)
 
+        # 页面切换时提示上下文变化
+        _note_page_switch(thread)
+
         # 消息流
         for msg in thread["messages"][-16:]:
             _render_ai_message(msg)
@@ -4268,7 +4368,17 @@ def render_ai_plugin():
                     _queue_ai(q, thread)
                     st.rerun()
 
-        # 流式回答:同步生成,期间输入区暂不渲染,结束后组件在下方恢复
+        # 失败重试:最后一条是失败回答时给一个重试按钮
+        msgs = thread["messages"]
+        if (not pending and len(msgs) >= 2 and msgs[-1]["role"] == "assistant"
+                and not msgs[-1].get("ok", True) and msgs[-2]["role"] == "user"):
+            if st.button("重试上一条", key=f"ai_retry_{thread['id']}_{len(msgs)}", width="stretch"):
+                msgs.pop()
+                if _set_ai_pending(msgs[-1]["content"], thread):
+                    _save_ai_thread(thread)
+                    st.rerun()
+
+        # 流式回答:同步生成,期间用灰置输入框壳占位,完成后 rerun 恢复真输入框
         if pending:
             _stream_pending_answer(thread, pending)
 

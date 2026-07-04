@@ -1,6 +1,7 @@
 """SQLite 连接与 CRUD。单文件库，WAL 模式以便看板读、runner 写并发。"""
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -134,3 +135,48 @@ def get_prices(conn, ticker, limit=250) -> list[dict]:
         (ticker, limit),
     ).fetchall()
     return [dict(r) for r in reversed(rows)]
+
+
+# ---- ai_threads（AI 助手会话）----
+def get_ai_threads(conn, limit: int = 50) -> list[dict]:
+    rows = conn.execute(
+        "SELECT id, title, data FROM ai_threads ORDER BY updated_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    threads = []
+    for r in rows:
+        try:
+            data = json.loads(r["data"] or "{}")
+        except ValueError:
+            data = {}
+        data["id"] = int(r["id"])
+        data["title"] = r["title"]
+        threads.append(data)
+    return threads
+
+
+def upsert_ai_thread(conn, thread: dict) -> int:
+    """写入/更新一条会话；返回其 id（新建时为自增 id）。"""
+    payload = json.dumps(
+        {k: v for k, v in thread.items() if k not in ("id", "title")},
+        ensure_ascii=False,
+    )
+    tid = thread.get("id")
+    if tid and conn.execute("SELECT 1 FROM ai_threads WHERE id=?", (tid,)).fetchone():
+        conn.execute(
+            "UPDATE ai_threads SET title=?, data=?, updated_at=? WHERE id=?",
+            (thread.get("title", ""), payload, now_iso(), tid),
+        )
+    else:
+        cur = conn.execute(
+            "INSERT INTO ai_threads(title, data, created_at, updated_at) VALUES (?,?,?,?)",
+            (thread.get("title", ""), payload, now_iso(), now_iso()),
+        )
+        tid = cur.lastrowid
+    conn.commit()
+    return int(tid)
+
+
+def delete_ai_thread(conn, thread_id: int) -> None:
+    conn.execute("DELETE FROM ai_threads WHERE id=?", (thread_id,))
+    conn.commit()

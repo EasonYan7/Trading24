@@ -50,3 +50,12 @@ CREATE TABLE IF NOT EXISTS notifications (
     sent_at TEXT,
     ok      INTEGER
 );
+
+-- AI 助手会话（弹窗聊天的持久化；data 为 JSON：messages/pinned_syms/excluded_syms/run_override 等）
+CREATE TABLE IF NOT EXISTS ai_threads (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    title      TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
