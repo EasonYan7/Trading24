@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS runs (
     model       TEXT,
     tokens      INTEGER DEFAULT 0,
     cost_usd    REAL DEFAULT 0,
-    error       TEXT
+    error       TEXT,
+    win_tracked INTEGER DEFAULT 1      -- 是否纳入胜率统计（复盘页可切换；0=不跟踪，记录仍保留）
 );
 CREATE INDEX IF NOT EXISTS idx_runs_ticker_date ON runs(ticker, trade_date);
 
@@ -58,4 +59,19 @@ CREATE TABLE IF NOT EXISTS ai_threads (
     data       TEXT NOT NULL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
+);
+
+-- 决策参数（final 报告的结构化提取，复盘用；见 trading24/extract.py）
+CREATE TABLE IF NOT EXISTS decision_params (
+    run_id               INTEGER PRIMARY KEY REFERENCES runs(id),
+    stop_loss            REAL,
+    entry_low            REAL,
+    entry_high           REAL,
+    initial_position_pct REAL,
+    max_position_pct     REAL,
+    price_target         REAL,
+    time_horizon         TEXT,
+    time_horizon_days    INTEGER,
+    model                TEXT,
+    extracted_at         TEXT
 );

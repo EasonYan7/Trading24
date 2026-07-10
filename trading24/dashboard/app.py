@@ -25,7 +25,7 @@ from streamlit_sortables import sort_items
 
 from trading24.config import (
     load_settings, save_settings, Settings,
-    load_watchlist, save_watchlist, TickerCfg, market_of,
+    load_watchlist, save_watchlist, TickerCfg, market_of, DATA_DIR,
 )
 from trading24.db import database as db
 from trading24.db.models import Run
@@ -295,6 +295,113 @@ header.stAppHeader,
   text-transform:uppercase;
   color:var(--t24-muted);
 }
+/* 控件标签变体：与表单控件文字同号(13px)，用于和输入框/下拉框并排的标签 */
+.caps.caps-field {
+  font-size:13px;
+}
+/* 交易计划条（详情页 hero 下方）：建仓区/止损/目标价/仓位/时间视野 */
+.t24-plan { display:flex; flex-wrap:wrap; gap:10px; margin:2px 0 16px; }
+.t24-plan-item { flex:1 1 150px; border:1px solid var(--t24-border); border-radius:12px;
+  background:var(--t24-surface); padding:10px 14px; }
+.t24-plan-label { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;
+  font-size:11px; color:var(--t24-muted); text-transform:uppercase; margin-bottom:4px; }
+.t24-plan-value { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;
+  font-size:15px; font-weight:600; color:var(--t24-text); white-space:nowrap; }
+/* 总览卡片里的一行式交易计划 */
+.t24-ov-plan { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;
+  font-size:11px; color:var(--t24-muted); margin:auto 0 0; padding-top:8px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.t24-ov-plan b { color:var(--t24-text); font-weight:600; }
+/* 复盘明细表（自绘，替代 data_editor：可控配色/胶囊/交互） */
+.t24-rt-wrap { overflow-x:auto; border:1px solid var(--t24-border); border-radius:12px;
+  background:var(--t24-surface); box-shadow:var(--t24-shadow); }
+.t24-rt { border-collapse:collapse; table-layout:fixed; width:100%;
+  min-width:960px; font-size:12.5px; }
+.t24-rt th {
+  font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:11px;
+  color:var(--t24-muted); text-transform:uppercase; letter-spacing:.03em; font-weight:600;
+  text-align:right; padding:9px 10px; border-bottom:1px solid var(--t24-border-strong);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  background:var(--t24-surface-low); }
+.t24-rt th:nth-child(-n+4) { text-align:left; }
+.t24-rt td {
+  font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:12px;
+  color:var(--t24-text); text-align:right; padding:8px 10px;
+  border-bottom:1px solid var(--t24-border); white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.t24-rt td:nth-child(-n+4) { text-align:left; }
+/* 隐藏的跟踪切换按钮（由表格圆点经 JS 代理点击，走局部重跑而非整页刷新） */
+.st-key-t24_review_track_btns { display:none; }
+/* 表头可点：排序/筛选（飞书式表头菜单） */
+.t24-rt thead th { cursor:pointer; user-select:none; }
+.t24-rt thead th:first-child { cursor:default; }
+.t24-rt thead th:not(:first-child):hover { color:var(--t24-text); }
+.t24-rt thead th[data-sorted]::after { content:" ↑"; color:var(--t24-primary); }
+.t24-rt thead th[data-sorted="desc"]::after { content:" ↓"; color:var(--t24-primary); }
+.t24-rt thead th[data-filtered] { color:var(--t24-primary); }
+.t24-rt-menu { position:fixed; z-index:2147483200; min-width:150px; max-height:340px;
+  overflow-y:auto; background:var(--t24-surface); border:1px solid var(--t24-border-strong);
+  border-radius:10px; box-shadow:0 12px 32px rgba(0,0,0,.18); padding:6px;
+  font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:12.5px; }
+.t24-rtm-item { display:block; width:100%; text-align:left; padding:6px 10px;
+  border:0; background:none; border-radius:6px; cursor:pointer;
+  color:var(--t24-text); font:inherit; }
+.t24-rtm-item:hover { background:var(--t24-surface-high); }
+.t24-rtm-item.on { color:var(--t24-primary); font-weight:700; }
+.t24-rtm-sep { border-top:1px solid var(--t24-border); margin:6px 0; }
+.t24-rtm-cap { font-size:10.5px; color:var(--t24-subtle); padding:2px 10px 4px;
+  text-transform:uppercase; letter-spacing:.05em; }
+.t24-rtm-check { display:flex; align-items:center; gap:7px; padding:5px 10px;
+  border-radius:6px; cursor:pointer; color:var(--t24-text); font-size:12px; }
+.t24-rtm-check:hover { background:var(--t24-surface-high); }
+.t24-rtm-check input { accent-color:var(--t24-primary); margin:0; }
+.t24-rt tbody tr:last-child td { border-bottom:0; }
+.t24-rt tbody tr { transition:background .12s ease; }
+.t24-rt tbody tr:hover { background:var(--t24-surface-high); }
+.t24-rt tbody tr.untracked { opacity:.45; }
+/* 30天窗列做浅色带，视觉分隔三个时间窗 */
+.t24-rt td:nth-child(11), .t24-rt th:nth-child(11) {
+  background:color-mix(in srgb, var(--t24-text) 3.5%, transparent); }
+.t24-rt .dot { display:inline-block; width:8px; height:8px; border-radius:50%;
+  margin-right:7px; vertical-align:middle; }
+.t24-rt .sym { font-weight:700; }
+.t24-rt .pos { color:var(--t24-primary); font-weight:600; }
+.t24-rt .neg { color:var(--t24-danger); font-weight:600; }
+.t24-rt .dim { color:var(--t24-subtle); }
+.t24-rt .chip { display:inline-flex; align-items:center; justify-content:center;
+  min-width:42px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:600; }
+.t24-rt .chip.win { color:#16A34A; background:color-mix(in srgb, #16A34A 14%, transparent); }
+.t24-rt .chip.loss { color:var(--t24-danger);
+  background:color-mix(in srgb, var(--t24-danger) 12%, transparent); }
+.t24-rt .chip.flat { color:var(--t24-muted);
+  background:color-mix(in srgb, var(--t24-muted) 13%, transparent); }
+.t24-rt .chip.pending { color:var(--t24-subtle); background:transparent;
+  border:1px dashed var(--t24-border-strong); font-weight:500; }
+.t24-rt .ret { margin-left:6px; }
+/* 时间窗格：判定胶囊居左、收益居右 */
+.t24-rt .wcell { display:flex; align-items:center; gap:6px; }
+.t24-rt .wcell .ret { margin-left:auto; }
+.t24-rt a.track { display:inline-flex; width:18px; height:18px; border-radius:50%;
+  border:1.5px solid var(--t24-border-strong); align-items:center; justify-content:center;
+  color:var(--t24-primary-text); font-size:11px; line-height:1;
+  text-decoration:none !important; }
+.t24-rt a.track.on { background:var(--t24-primary); border-color:var(--t24-primary); }
+.t24-rt a.track:hover { border-color:var(--t24-primary); }
+/* 顶部摘要 tile 的补充内容：状态胶囊 / 分布比例条 / 小注 */
+.t24-ov-chiprow { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+.t24-ov-chip { display:inline-flex; align-items:center; gap:5px;
+  font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:11px;
+  color:var(--t24-muted); border:1px solid var(--t24-border);
+  border-radius:999px; padding:2px 9px; white-space:nowrap; }
+.t24-ov-chip i { width:6px; height:6px; border-radius:50%; display:inline-block;
+  background:var(--t24-subtle); flex:0 0 auto; }
+.t24-ov-dist-bar { display:flex; height:8px; border-radius:999px; overflow:hidden;
+  margin:12px 0 10px; background:var(--t24-surface-high); }
+.t24-ov-dist-bar span { display:block; height:100%; }
+.t24-ov-dist-row { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;
+  font-size:11px; margin-top:4px; color:var(--t24-muted); }
+.t24-ov-tile-note { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;
+  font-size:11px; color:var(--t24-muted); margin-top:10px; }
 [data-testid="stMetric"] {
   background:var(--t24-surface);
   border:1px solid var(--t24-border);
@@ -356,13 +463,6 @@ header.stAppHeader,
   line-height:1.15;
   color:var(--t24-text);
 }
-.t24-price { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:22px; font-weight:600; color:var(--t24-text); }
-.t24-card-name {
-  font-family:'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif !important;
-  font-size:17px;
-  font-weight:700;
-  color:var(--t24-text);
-}
 .t24-concl {
   font-family:'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif !important;
   font-size:14px;
@@ -374,7 +474,7 @@ header.stAppHeader,
 .t24-ov-tile { background:var(--t24-surface-high); border-radius:12px; padding:14px 16px; }
 .t24-ov-tile-label { font-size:13px; color:var(--t24-muted); margin-bottom:6px; }
 .t24-ov-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(290px, 1fr)); gap:12px; }
-.t24-ov-card { display:block; color:inherit; background:var(--t24-surface);
+.t24-ov-card { display:flex; flex-direction:column; color:inherit; background:var(--t24-surface);
   border:1px solid var(--t24-border); border-radius:12px; padding:14px 16px; box-shadow:var(--t24-shadow);
   transition:border-color .15s ease, background .15s ease; }
 .t24-ov-card, .t24-ov-card:hover, .t24-ov-card * { text-decoration:none !important; }
@@ -389,7 +489,9 @@ header.stAppHeader,
 .t24-ov-spark { width:100%; height:30px; margin:8px 0; display:block; }
 .t24-ov-concl { font-size:13px; color:var(--t24-muted); line-height:1.5; min-height:39px;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.t24-ov-foot { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+.t24-ov-foot { display:flex; justify-content:space-between; align-items:center; margin-top:auto; padding-top:10px; }
+/* 有计划行时：计划行先吃掉弹性空间钉到底部，footer 紧贴其后 */
+.t24-ov-plan + .t24-ov-foot { margin-top:0; }
 .t24-ov-foot-age { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace; font-size:11px; color:var(--t24-muted); }
 .t24-ov-foot-cta { font-size:12px; color:var(--t24-primary); white-space:nowrap; }
 .t24-page-title {
@@ -626,8 +728,19 @@ button[data-testid^="stBaseButton"]:focus-visible {
   display:flex !important;
   align-items:center !important;
   justify-content:center !important;
-  color:var(--t24-text) !important;
+  color:var(--t24-muted) !important;
   font-size:0 !important;
+  transition:color .15s ease, background-color .15s ease !important;
+}
+.st-key-theme_toggle_dark button:hover,
+.st-key-theme_toggle_light button:hover,
+.st-key-open_settings button:hover,
+.st-key-open_ai_from_nav button:hover {
+  color:var(--t24-text) !important;
+  background:var(--t24-surface-high) !important;
+  border:1px solid transparent !important;
+  transform:none !important;
+  box-shadow:none !important;
 }
 .st-key-theme_toggle_dark button::before,
 .st-key-theme_toggle_light button::before,
@@ -657,20 +770,16 @@ button[data-testid^="stBaseButton"]:focus-visible {
   color:transparent !important;
 }
 .st-key-open_settings button::before {
-  -webkit-mask-size:22px 22px;
-  mask-size:22px 22px;
-  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' fill-rule='evenodd' clip-rule='evenodd' d='M9.95 2.54A.9.9 0 0 1 10.84 1.8h2.32a.9.9 0 0 1 .9.74l.32 1.9a6.9 6.9 0 0 1 1.62.94l1.8-.7a.9.9 0 0 1 1.11.4l1.16 2a.9.9 0 0 1-.2 1.15l-1.5 1.2a6.96 6.96 0 0 1 0 1.88l1.5 1.2a.9.9 0 0 1 .2 1.15l-1.16 2a.9.9 0 0 1-1.11.4l-1.8-.7a6.9 6.9 0 0 1-1.62.94l-.32 1.9a.9.9 0 0 1-.9.74h-2.32a.9.9 0 0 1-.9-.74l-.32-1.9a6.9 6.9 0 0 1-1.62-.94l-1.8.7a.9.9 0 0 1-1.11-.4l-1.16-2a.9.9 0 0 1 .2-1.15l1.5-1.2a6.96 6.96 0 0 1 0-1.88l-1.5-1.2a.9.9 0 0 1-.2-1.15l1.16-2a.9.9 0 0 1 1.11-.4l1.8.7a6.9 6.9 0 0 1 1.62-.94l.32-1.9ZM12 15a3 3 0 1 0 0-6a3 3 0 0 0 0 6Z'/%3E%3C/svg%3E");
-  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' fill-rule='evenodd' clip-rule='evenodd' d='M9.95 2.54A.9.9 0 0 1 10.84 1.8h2.32a.9.9 0 0 1 .9.74l.32 1.9a6.9 6.9 0 0 1 1.62.94l1.8-.7a.9.9 0 0 1 1.11.4l1.16 2a.9.9 0 0 1-.2 1.15l-1.5 1.2a6.96 6.96 0 0 1 0 1.88l1.5 1.2a.9.9 0 0 1 .2 1.15l-1.16 2a.9.9 0 0 1-1.11.4l-1.8-.7a6.9 6.9 0 0 1-1.62.94l-.32 1.9a.9.9 0 0 1-.9.74h-2.32a.9.9 0 0 1-.9-.74l-.32-1.9a6.9 6.9 0 0 1-1.62-.94l-1.8.7a.9.9 0 0 1-1.11-.4l-1.16-2a.9.9 0 0 1 .2-1.15l1.5-1.2a6.96 6.96 0 0 1 0-1.88l-1.5-1.2a.9.9 0 0 1-.2-1.15l1.16-2a.9.9 0 0 1 1.11-.4l1.8.7a6.9 6.9 0 0 1 1.62-.94l.32-1.9ZM12 15a3 3 0 1 0 0-6a3 3 0 0 0 0 6Z'/%3E%3C/svg%3E");
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
 }
 .st-key-theme_toggle_dark button::before {
-  -webkit-mask-size:23px 23px;
-  mask-size:23px 23px;
-  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2.4a9.6 9.6 0 1 0 9.6 9.6a1 1 0 0 0-1.66-.75a6.5 6.5 0 0 1-9.19-9.19A1 1 0 0 0 12 2.4Z'/%3E%3C/svg%3E");
-  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2.4a9.6 9.6 0 1 0 9.6 9.6a1 1 0 0 0-1.66-.75a6.5 6.5 0 0 1-9.19-9.19A1 1 0 0 0 12 2.4Z'/%3E%3C/svg%3E");
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9Z'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9Z'/%3E%3C/svg%3E");
 }
 .st-key-theme_toggle_light button::before {
-  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10Zm0-5h1v3h-2V2h1Zm0 17h1v3h-2v-3h1ZM4.2 5.6l1.4-1.4l2.1 2.1l-1.4 1.4l-2.1-2.1Zm12.1 12.1l1.4-1.4l2.1 2.1l-1.4 1.4l-2.1-2.1ZM2 11h3v2H2v-2Zm17 0h3v2h-3v-2ZM5.6 19.8l-1.4-1.4l2.1-2.1l1.4 1.4l-2.1 2.1ZM17.7 7.7l-1.4-1.4l2.1-2.1l1.4 1.4l-2.1 2.1Z'/%3E%3C/svg%3E");
-  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 7a5 5 0 1 0 0 10a5 5 0 0 0 0-10Zm0-5h1v3h-2V2h1Zm0 17h1v3h-2v-3h1ZM4.2 5.6l1.4-1.4l2.1 2.1l-1.4 1.4l-2.1-2.1Zm12.1 12.1l1.4-1.4l2.1 2.1l-1.4 1.4l-2.1-2.1ZM2 11h3v2H2v-2Zm17 0h3v2h-3v-2ZM5.6 19.8l-1.4-1.4l2.1-2.1l1.4 1.4l-2.1 2.1ZM17.7 7.7l-1.4-1.4l2.1-2.1l1.4 1.4l-2.1 2.1Z'/%3E%3C/svg%3E");
+  -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='m4.93 4.93 1.41 1.41'/%3E%3Cpath d='m17.66 17.66 1.41 1.41'/%3E%3Cpath d='M2 12h2'/%3E%3Cpath d='M20 12h2'/%3E%3Cpath d='m6.34 17.66-1.41 1.41'/%3E%3Cpath d='m19.07 4.93-1.41 1.41'/%3E%3C/svg%3E");
+  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2'/%3E%3Cpath d='M12 20v2'/%3E%3Cpath d='m4.93 4.93 1.41 1.41'/%3E%3Cpath d='m17.66 17.66 1.41 1.41'/%3E%3Cpath d='M2 12h2'/%3E%3Cpath d='M20 12h2'/%3E%3Cpath d='m6.34 17.66-1.41 1.41'/%3E%3Cpath d='m19.07 4.93-1.41 1.41'/%3E%3C/svg%3E");
 }
 .st-key-open_ai_from_nav button::before {
   -webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 3h10v2h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3h-1.5L14 21v-4H7a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3V3Zm0 4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h9v2l1.8-2H19a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H7Zm2 3h2v2H9v-2Zm4 0h2v2h-2v-2Z'/%3E%3C/svg%3E");
@@ -897,112 +1006,6 @@ button[data-testid^="stBaseButton"]:focus-visible {
   bottom:0;
   width:4px;
   background:var(--accent, var(--t24-muted));
-}
-.t24-watch-top {
-  display:flex;
-  align-items:flex-start;
-  justify-content:space-between;
-  gap:12px;
-}
-.t24-watch-name {
-  font-size:22px;
-  font-weight:800;
-  color:var(--t24-text);
-  white-space:nowrap;
-}
-.t24-watch-code-line {
-  display:flex;
-  align-items:center;
-  gap:7px;
-  margin-top:2px;
-}
-.t24-watch-code {
-  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
-  font-size:12px;
-  font-weight:650;
-  color:var(--t24-muted);
-  line-height:1.2;
-  white-space:nowrap;
-}
-.t24-watch-market {
-  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
-  font-size:10px;
-  font-weight:650;
-  color:var(--t24-muted);
-  line-height:1.2;
-}
-.t24-watch-price {
-  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
-  font-size:17px;
-  font-weight:600;
-  color:var(--accent, var(--t24-text));
-  margin-top:6px;
-  white-space:nowrap;
-}
-.t24-watch-side {
-  text-align:right;
-  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
-  font-size:12px;
-  color:var(--t24-muted);
-  min-width:92px;
-}
-.t24-watch-metric {
-  margin-bottom:4px;
-}
-.t24-watch-metric-label {
-  display:block;
-  color:var(--t24-subtle);
-  font-family:'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif !important;
-  font-size:11px;
-  line-height:1.15;
-}
-.t24-watch-metric-value {
-  display:block;
-  font-size:12px;
-  line-height:1.25;
-  white-space:nowrap;
-}
-.t24-watch-decision {
-  --decision: var(--t24-muted);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  margin:16px 0 16px;
-  padding:10px 12px;
-  border:1px solid color-mix(in srgb, var(--decision) 34%, var(--t24-border));
-  border-radius:12px;
-  background:color-mix(in srgb, var(--decision) 8%, transparent);
-}
-.t24-watch-decision-kicker {
-  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
-  font-size:10px;
-  line-height:1.2;
-  color:var(--t24-muted);
-  margin-bottom:4px;
-}
-.t24-watch-decision-value {
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  color:var(--decision);
-  font-size:13px;
-  font-weight:750;
-  line-height:1.2;
-}
-.t24-watch-decision-value::before {
-  content:"";
-  width:8px;
-  height:8px;
-  border-radius:99px;
-  background:var(--decision);
-  box-shadow:0 0 0 4px color-mix(in srgb, var(--decision) 14%, transparent);
-}
-.t24-watch-decision-age {
-  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
-  color:var(--t24-muted);
-  font-size:12px;
-  white-space:nowrap;
 }
 .t24-sparkline-shell {
   height:78px;
@@ -1751,6 +1754,17 @@ button[data-testid^="stBaseButton"]:focus-visible {
   color:var(--t24-muted);
   line-height:1.25;
 }
+/* 失败记录的「重跑」chip：可点击，主色描边 */
+a.t24-rerun-chip, a.t24-rerun-chip:visited {
+  color:var(--t24-primary) !important;
+  border-color:color-mix(in srgb, var(--t24-primary) 60%, transparent) !important;
+  background:color-mix(in srgb, var(--t24-primary) 10%, transparent);
+  text-decoration:none !important;
+  cursor:pointer;
+}
+a.t24-rerun-chip:hover {
+  background:color-mix(in srgb, var(--t24-primary) 18%, transparent);
+}
 .t24-decision-chip {
   display:inline-flex;
   align-items:center;
@@ -1802,34 +1816,14 @@ button[data-testid^="stBaseButton"]:focus-visible {
   gap:10px;
   margin:4px 0 2px;
 }
-.t24-brand-mark {
-  width:26px;
-  height:26px;
-  border-radius:6px;
-  background:var(--t24-primary);
-  color:var(--t24-primary-text);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important;
-  font-size:13px;
-  font-weight:800;
-}
-.t24-brand-name {
-  font-family:'Inter', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif !important;
-  font-size:21px;
-  font-weight:800;
-  line-height:1;
-  color:var(--t24-text);
-}
 .t24-theme-switch { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 10px; }
 .t24-ai-msg { border:1px solid var(--t24-border); border-radius:10px; padding:8px 11px; margin:6px 0; background:var(--t24-surface); font-size:13px; line-height:1.55; }
 .t24-ai-msg.user { background:var(--t24-ai-user); border-color:var(--t24-border-strong); }
 .t24-ai-msg.assistant { background:var(--t24-ai-assistant); border-color:var(--t24-border); }
 .t24-ai-msg :is(p,li) { font-size:13px !important; line-height:1.55 !important; margin:.25em 0 !important; }
-.t24-ai-msg :is(h1,h2,h3,h4) { font-size:13.5px !important; font-weight:700 !important; margin:.45em 0 .2em !important; }
+.t24-ai-msg :is(h1,h2,h3,h4) { font-size:14px !important; font-weight:700 !important; margin:.45em 0 .2em !important; }
 .t24-ai-msg table { font-size:12px !important; }
-.t24-ai-meta { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:9px; color:var(--t24-muted); margin-bottom:3px; }
+.t24-ai-meta { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:10px; color:var(--t24-muted); margin-bottom:3px; }
 .t24-ai-title { font-size:15px; font-weight:700; color:var(--t24-text); height:30px; display:flex; align-items:center; margin:0; transform:translateY(-8px); }
 .t24-ai-scope { font-size:11px; margin:4px 0 6px; }
 .t24-ai-stat { border:1px solid var(--t24-border); border-radius:8px; padding:10px 12px; background:var(--t24-surface); min-height:58px; }
@@ -1896,20 +1890,29 @@ button[data-testid^="stBaseButton"]:focus-visible {
             padding: 10px 12px 6px;
             border-bottom: 1px solid var(--t24-border);
         }
-        /* 圆形 × 关闭按钮（头部左侧） */
+        /* 圆形 × 关闭按钮：悬浮固定在面板左缘外侧靠下，长对话滚动时始终可见 */
+        .st-key-t24_ai_panel .st-key-ai_close {
+            position: fixed;
+            right: 426px;             /* 面板 right:20px + width:392px + 间距 */
+            bottom: 96px;
+            width: 34px;
+            z-index: 2147483001;
+        }
         .st-key-ai_close button {
             border-radius: 50% !important;
-            width: 30px !important; min-width: 30px !important;
-            height: 30px !important; min-height: 30px !important;
-            padding: 0 !important; font-size: 14px !important;
-            border: none !important; box-shadow: none !important;
-            background: color-mix(in srgb, currentColor 9%, transparent) !important;
+            width: 34px !important; min-width: 34px !important;
+            height: 34px !important; min-height: 34px !important;
+            padding: 0 !important; font-size: 15px !important;
+            border: 1px solid var(--t24-border-strong) !important;
+            box-shadow: var(--t24-shadow) !important;
+            background: var(--t24-surface) !important;
             color: var(--t24-text) !important;
             display: flex !important; align-items: center !important; justify-content: center !important;
         }
         .st-key-ai_close button:hover {
-            background: color-mix(in srgb, currentColor 18%, transparent) !important;
-            border: none !important; box-shadow: none !important;
+            background: var(--t24-surface-high) !important;
+            border: 1px solid var(--t24-border-strong) !important;
+            transform: none !important;
         }
         /* 头部图标按钮：新对话(加号) + 选择记录(列表) */
         .st-key-ai_new_chat button, .st-key-ai_threads_btn button {
@@ -1949,7 +1952,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
         }
         /* 范围 chip（展开/收起上下文清单） */
         .st-key-ai_scope_chip button {
-            font-size: 11.5px !important; min-height: 26px !important; padding: 2px 10px !important;
+            font-size: 11px !important; min-height: 26px !important; padding: 2px 10px !important;
             width: 100% !important;
             border-radius: 999px !important;
             color: var(--t24-primary) !important;
@@ -1976,7 +1979,7 @@ button[data-testid^="stBaseButton"]:focus-visible {
         /* 会话列表条目 */
         [class*="st-key-ai_thread_"] button {
             text-align: left !important; justify-content: flex-start !important;
-            font-size: 12.5px !important; white-space: normal !important;
+            font-size: 12px !important; white-space: normal !important;
             padding: 8px 11px !important; line-height: 1.35 !important; border-radius: 10px !important;
         }
         [class*="st-key-ai_thread_del_"] button {
@@ -2019,11 +2022,11 @@ button[data-testid^="stBaseButton"]:focus-visible {
         .t24-ai-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
         .t24-ai-chip {
             border: 1px solid var(--t24-border); border-radius: 999px; padding: 2px 8px;
-            color: var(--t24-muted); font-size: 10.5px; font-weight: 600;
+            color: var(--t24-muted); font-size: 11px; font-weight: 600;
         }
         .st-key-t24_ai_panel iframe { display: block; }
         [class*="st-key-ai_sugg_"] button {
-            font-size: 12.5px !important; white-space: normal !important; text-align: left !important;
+            font-size: 12px !important; white-space: normal !important; text-align: left !important;
             padding: 6px 11px !important; min-height: 0 !important; line-height: 1.35 !important;
             border-radius: 8px !important; color: var(--t24-text-muted, var(--t24-text)) !important;
         }
@@ -2040,6 +2043,11 @@ button[data-testid^="stBaseButton"]:focus-visible {
             .st-key-t24_ai_panel {
                 left: 12px; right: 12px; width: auto;
                 bottom: 12px; max-height: calc(100vh - 24px);
+            }
+            /* 小屏：悬浮关闭按钮回到头部行内（面板全宽，左缘外没有空间） */
+            .st-key-t24_ai_panel .st-key-ai_close {
+                position: static;
+                width: auto;
             }
             /* 小屏禁止面板内 columns 堆叠：头部按钮保持一行 */
             .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has(.st-key-ai_threads_btn) {
@@ -2229,6 +2237,61 @@ def decision_label(decision: str | None) -> str:
     return BADGE.get(_norm_decision(decision), ("", "—"))[1]
 
 
+def _plan_num(v) -> str:
+    """120.0 → 120，1.75 → 1.75（去掉无意义的小数尾巴）。"""
+    return f"{float(v):.10g}"
+
+
+def plan_items(run) -> list[tuple[str, str, str]]:
+    """从 decision_params 取该次决策的交易计划 → [(标签, 值, 颜色)]。没有则 []。"""
+    if not run or run.id is None or run.status != "success":
+        return []
+    p = db.get_decision_params(conn, int(run.id))
+    if not p:
+        return []
+    items = []
+    lo, hi = p.get("entry_low"), p.get("entry_high")
+    if lo is not None or hi is not None:
+        lo = lo if lo is not None else hi
+        hi = hi if hi is not None else lo
+        v = _plan_num(lo) if lo == hi else f"{_plan_num(lo)}–{_plan_num(hi)}"
+        zone_label = "减仓区间" if _norm_decision(run.decision) == "SELL" else "建仓区间"
+        items.append((zone_label, v, "var(--t24-primary)"))
+    if p.get("stop_loss") is not None:
+        items.append(("止损", _plan_num(p["stop_loss"]), "var(--t24-danger)"))
+    if p.get("price_target") is not None:
+        items.append(("目标价", _plan_num(p["price_target"]), "var(--t24-text)"))
+    ip, mp = p.get("initial_position_pct"), p.get("max_position_pct")
+    if ip is not None or mp is not None:
+        seg = ([f"初始 {_plan_num(ip)}%"] if ip is not None else []) + \
+              ([f"上限 {_plan_num(mp)}%"] if mp is not None else [])
+        items.append(("建议仓位", " · ".join(seg), "var(--t24-text)"))
+    if p.get("time_horizon"):
+        items.append(("时间视野", str(p["time_horizon"]), "var(--t24-text)"))
+    return items
+
+
+def plan_strip_html(run) -> str:
+    """详情页交易计划条；无参数时返回空串。"""
+    items = plan_items(run)
+    if not items:
+        return ""
+    tiles = "".join(
+        f"<div class='t24-plan-item'><div class='t24-plan-label'>{html_safe(lb)}</div>"
+        f"<div class='t24-plan-value' style='color:{color};'>{html_safe(v)}</div></div>"
+        for lb, v, color in items)
+    return ("<div class='caps' style='margin:2px 0 6px;'>交易计划 · Trade Plan</div>"
+            f"<div class='t24-plan'>{tiles}</div>")
+
+
+def plan_line_html(run) -> str:
+    """总览卡片里的一行式计划（只留价格三件套，避免撑爆卡片）。"""
+    keep = {"建仓区间": "建仓", "减仓区间": "减仓", "止损": "止损", "目标价": "目标"}
+    segs = [f"{keep[lb]} <b>{html_safe(v)}</b>"
+            for lb, v, _ in plan_items(run) if lb in keep]
+    return f"<div class='t24-ov-plan'>{' · '.join(segs)}</div>" if segs else ""
+
+
 def fmt_num(v: float | int | None) -> str:
     if v is None:
         return "未设置"
@@ -2289,11 +2352,115 @@ def get_conn():
     return db.connect(check_same_thread=False)
 
 
+_REFRESH_MARK = DATA_DIR / ".last_price_refresh"  # 落盘：重启进程不重刷
+
+
+@st.cache_resource
+def _price_refresh_state() -> dict:
+    """进程级共享的行情刷新状态（多标签页/多访客共用一个闸门）。
+    启动时从磁盘水合，避免每次重启看板都触发一次全量刷新。
+    规则：每个自然日首次进入页面时刷新一次，当天内不再刷。"""
+    try:
+        raw = json.loads(_REFRESH_MARK.read_text())
+        return {"date": raw["date"], "key": tuple(raw["key"])}
+    except Exception:  # noqa: BLE001  首次运行/旧格式/文件损坏 → 视为今天还没刷过
+        return {"date": None, "key": None}
+
+
+def _save_refresh_mark(state: dict) -> None:
+    try:
+        _REFRESH_MARK.write_text(json.dumps(
+            {"date": state["date"], "key": list(state["key"] or [])}))
+    except Exception:  # noqa: BLE001  写盘失败不影响功能（只是重启后会多刷一次）
+        pass
+
+
+def _loader_html(symbols: tuple[str, ...]) -> str:
+    """全屏居中 loading：毛玻璃蒙层 + K线柱跳动动画。颜色走 --t24-* 主题变量。"""
+    tape = " · ".join(symbols[:6]) + (" …" if len(symbols) > 6 else "")
+    return f"""
+<style>
+.t24-quote-loader{{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;
+  justify-content:center;background:color-mix(in srgb, var(--t24-bg) 74%, transparent);
+  backdrop-filter:blur(10px) saturate(1.15);-webkit-backdrop-filter:blur(10px) saturate(1.15);
+  animation:t24qlFade .35s ease}}
+.t24-ql-card{{display:flex;flex-direction:column;align-items:center;gap:16px;
+  padding:44px 64px;background:var(--t24-surface);border:1px solid var(--t24-border);
+  border-radius:20px;box-shadow:var(--t24-shadow), 0 28px 64px -20px rgba(0,0,0,.22)}}
+.t24-ql-candles{{display:flex;align-items:center;gap:11px;height:72px}}
+.t24-ql-candles i{{position:relative;display:block;width:13px;height:52px;border-radius:3.5px;
+  transform-origin:center;animation:t24qlBar 1.15s ease-in-out infinite}}
+.t24-ql-candles i::before{{content:"";position:absolute;left:50%;top:-11px;bottom:-11px;
+  width:2px;transform:translateX(-50%);background:inherit;opacity:.5;border-radius:1px}}
+.t24-ql-candles i:nth-child(1){{background:#16A34A;animation-delay:0s;height:38px}}
+.t24-ql-candles i:nth-child(2){{background:#DC2626;animation-delay:.14s;height:56px}}
+.t24-ql-candles i:nth-child(3){{background:var(--t24-primary);animation-delay:.28s;height:44px}}
+.t24-ql-candles i:nth-child(4){{background:#16A34A;animation-delay:.42s;height:60px}}
+.t24-ql-candles i:nth-child(5){{background:#DC2626;animation-delay:.56s;height:40px}}
+.t24-ql-candles i:nth-child(6){{background:#16A34A;animation-delay:.70s;height:52px}}
+@keyframes t24qlBar{{0%,100%{{transform:scaleY(.5)}}50%{{transform:scaleY(1.12)}}}}
+@keyframes t24qlFade{{from{{opacity:0}}to{{opacity:1}}}}
+.t24-ql-title{{font-size:21px;font-weight:600;color:var(--t24-text);letter-spacing:.5px;
+  display:flex;align-items:baseline;gap:2px}}
+.t24-ql-title u{{display:inline-flex;gap:3px;text-decoration:none;padding-left:2px}}
+.t24-ql-title u b{{width:4px;height:4px;border-radius:50%;background:var(--t24-primary);
+  animation:t24qlDot 1.2s ease-in-out infinite}}
+.t24-ql-title u b:nth-child(2){{animation-delay:.18s}}
+.t24-ql-title u b:nth-child(3){{animation-delay:.36s}}
+@keyframes t24qlDot{{0%,100%{{opacity:.25;transform:translateY(0)}}
+  50%{{opacity:1;transform:translateY(-4px)}}}}
+.t24-ql-sub{{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;
+  letter-spacing:1.6px;text-transform:uppercase;color:var(--t24-muted)}}
+.t24-ql-tape{{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;
+  color:var(--t24-subtle);letter-spacing:.6px}}
+@media (prefers-reduced-motion: reduce){{
+  .t24-ql-candles i,.t24-ql-title u b{{animation:none}}}}
+</style>
+<div class="t24-quote-loader"><div class="t24-ql-card">
+  <div class="t24-ql-candles"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="t24-ql-title">正在刷新行情<u><b></b><b></b><b></b></u></div>
+  <div class="t24-ql-sub">Pulling live quotes · MA · RSI · MACD</div>
+  <div class="t24-ql-tape">{html_safe(tape)}</div>
+</div></div>"""
+
+
+def _auto_refresh_prices(symbols: tuple[str, ...]) -> None:
+    """打开看板时顺带刷新行情（不调 LLM，近零成本）。
+
+    闸门规则：每个自然日首次进入页面时全量刷新一次；当天已刷过则跳过
+    （跨重启也有效，标记落盘）。真抓数时显示全屏 loading 蒙层。"""
+    state = _price_refresh_state()
+    today = date.today().isoformat()
+    if state["date"] == today:
+        if state["key"] != symbols:
+            # 关注列表变了但今天已刷过：不全量重刷（新增标的在添加时已抓过
+            # 价格），只更新指纹。
+            state["key"] = symbols
+            _save_refresh_mark(state)
+        return
+    overlay = st.empty()
+    overlay.markdown(_loader_html(symbols), unsafe_allow_html=True)
+    try:
+        c = db.connect(check_same_thread=False)
+        for sym in symbols:
+            try:
+                prices.snapshot(c, sym)
+            except Exception:  # noqa: BLE001  失败隔离：某只抓不到不挡开页
+                pass
+    finally:
+        state["date"] = today
+        state["key"] = symbols
+        _save_refresh_mark(state)
+        overlay.empty()
+
+
 conn = get_conn()
 st.markdown(THEME_CSS + CSS, unsafe_allow_html=True)
 run_time, watch = load_watchlist()
 symbols = [t.symbol for t in watch]
 names = {t.symbol: t.name for t in watch}
+if symbols:
+    _auto_refresh_prices(tuple(symbols))  # 每个自然日首次进入时刷新一次
 latest = {s: (db.get_runs(conn, ticker=s, limit=1) or [None])[0] for s in symbols}
 
 # 路由从 URL query params 水合：自动刷新走整页 reload 会清空 session_state，
@@ -2309,6 +2476,9 @@ if "view" not in st.session_state or "detail" not in st.session_state:
             st.session_state.last_detail = st.session_state.detail
     elif _p == "watchlist":
         st.session_state.view = "管理关注列表"
+        st.session_state.detail = None
+    elif _p == "review":
+        st.session_state.view = "复盘"
         st.session_state.detail = None
     else:
         st.session_state.view = "总览"
@@ -2606,7 +2776,9 @@ def _write_route_query() -> None:
         st.query_params["p"] = "analysis"
         st.query_params["t"] = st.session_state.detail
     else:
-        st.query_params["p"] = "watchlist" if st.session_state.view == "管理关注列表" else "overview"
+        _v = st.session_state.view
+        st.query_params["p"] = ("watchlist" if _v == "管理关注列表"
+                                else "review" if _v == "复盘" else "overview")
         if "t" in st.query_params:
             del st.query_params["t"]
 
@@ -2637,11 +2809,19 @@ def goto_watchlist() -> None:
     _write_route_query()
 
 
+def goto_review() -> None:
+    st.session_state.view = "复盘"
+    st.session_state.detail = None
+    _write_route_query()
+
+
 def route_key() -> str:
     if st.session_state.detail:
         return "Analysis"
     if st.session_state.view == "管理关注列表":
         return "Watchlist"
+    if st.session_state.view == "复盘":
+        return "Review"
     return "Dashboard"
 
 
@@ -2808,29 +2988,36 @@ def resolve_ticker_search(value: str | None) -> str | None:
 def normalize_new_ticker(value: str | None) -> str:
     raw = (value or "").strip().upper()
     raw = raw.split("·", 1)[0].strip()
-    return re.sub(r"\s+", "", raw)
+    raw = re.sub(r"\s+", "", raw)
+    # 港股归一化成 Yahoo 的 4 位格式：09988.HK→9988.HK，700.HK→0700.HK
+    m = re.fullmatch(r"(\d{1,5})\.HK", raw)
+    if m and int(m.group(1)) < 10000:
+        raw = f"{int(m.group(1)):04d}.HK"
+    return raw
 
 
 def is_ticker_like(value: str) -> bool:
     return bool(re.fullmatch(r"[0-9A-Z][0-9A-Z.]{0,18}", value))
 
 
-def analysis_worker(symbol: str, trade_date: str) -> None:
+def analysis_worker(symbol: str, trade_date: str, run_id: int | None = None) -> None:
     try:
-        runner.run_one(symbol, trade_date)
+        runner.run_one(symbol, trade_date, run_id=run_id)
     except Exception:
         # runner.run_one already records the failed run in SQLite.
         pass
 
 
-def start_background_analysis(symbol: str) -> None:
+def start_background_analysis(symbol: str, run_id: int | None = None,
+                              trade_date: str | None = None) -> None:
+    """run_id 传入时=复用该记录重跑（失败重试），不新建决策记录。"""
     pending = st.session_state.pending_analysis_symbols
     if symbol in pending:
         return
     pending[symbol] = datetime.now(timezone.utc).isoformat()
     thread = threading.Thread(
         target=analysis_worker,
-        args=(symbol, date.today().isoformat()),
+        args=(symbol, trade_date or date.today().isoformat(), run_id),
         daemon=True,
     )
     thread.start()
@@ -2964,7 +3151,8 @@ def render_live_analysis_status(sym: str, run: Run | None) -> None:
     status = run.status if run else ("pending" if pending else None)
     if status in {"pending", "running"}:
         _live_analysis_fragment(sym)
-    elif status in {"success", "failed"}:
+    elif status in {"success", "failed"} and pending:
+        # 只在本会话刚看着它跑完的这一次显示收尾卡；平时访问不出现
         st.session_state.pending_analysis_symbols.pop(sym, None)
         _render_live_status_card(sym, run)
 
@@ -3181,7 +3369,7 @@ def render_top_nav() -> None:
     active = route_key()
     with st.container(key="t24_topnav"):
         nav_cols = st.columns(
-            [1.3, .5, .5, .5, 1.95, 1.3, .5, .5, .5],
+            [1.3, .5, .5, .5, .5, 1.6, 1.3, .5, .5, .5],
             gap="small",
             vertical_alignment="center",
         )
@@ -3189,15 +3377,16 @@ def render_top_nav() -> None:
         nav_items = [
             ("Dashboard", "总览", goto_dashboard, icon("overview", 15)),
             ("Analysis", "分析", goto_analysis, icon("analysis", 15)),
+            ("Review", "复盘", goto_review, None),
             ("Watchlist", "关注", goto_watchlist, icon("watch", 15)),
         ]
-        for col, (key, label, handler, _) in zip(nav_cols[1:4], nav_items):
+        for col, (key, label, handler, _) in zip(nav_cols[1:5], nav_items):
             if col.button(label, key=f"topnav_{key}", width="stretch",
                           type="primary" if active == key else "secondary"):
                 handler()
                 st.rerun()
-        nav_cols[4].markdown("")  # 弹性留白，把搜索栏推到右侧
-        search = nav_cols[5].selectbox(
+        nav_cols[5].markdown("")  # 弹性留白，把搜索栏推到右侧
+        search = nav_cols[6].selectbox(
             "Search ticker",
             symbols,
             index=None,
@@ -3215,7 +3404,7 @@ def render_top_nav() -> None:
                 goto_analysis(matched)
                 st.rerun()
             candidate = normalize_new_ticker(str(search))
-            if nav_cols[6].button("添加", key="search_add_ticker", width="stretch"):
+            if nav_cols[7].button("添加", key="search_add_ticker", width="stretch"):
                 if not is_ticker_like(candidate):
                     st.toast("请输入股票代码，例如 AAPL / 600519.SS / 0700.HK")
                     st.rerun()
@@ -3225,7 +3414,8 @@ def render_top_nav() -> None:
                     except Exception:
                         got = 0
                 if not got:
-                    st.toast(f"取不到 {candidate} 的价格数据，请检查代码格式")
+                    st.toast(f"取不到 {candidate} 的价格数据，请检查代码格式"
+                             "（美股直接代码 / A股 .SS/.SZ / 港股 4位数.HK）", icon="⚠️")
                     st.rerun()
                 rt, current_watch = load_watchlist()
                 current_symbols = [t.symbol for t in current_watch]
@@ -3238,13 +3428,13 @@ def render_top_nav() -> None:
                 st.toast(f"已添加 {candidate}，正在运行分析")
                 st.rerun()
         else:
-            nav_cols[6].markdown("")
+            nav_cols[7].markdown("")
         next_theme = "深色" if st.session_state.theme_mode == "浅色" else "浅色"
         theme_key = "theme_toggle_dark" if next_theme == "深色" else "theme_toggle_light"
-        if nav_cols[7].button("切换主题", key=theme_key, width="stretch", help="切换深浅主题"):
+        if nav_cols[8].button("切换主题", key=theme_key, width="stretch", help="切换深浅主题"):
             st.session_state.theme_mode = next_theme
             st.rerun()
-        if nav_cols[8].button("设置", key="open_settings", width="stretch"):
+        if nav_cols[9].button("设置", key="open_settings", width="stretch"):
             render_settings_dialog()
 
 
@@ -3338,6 +3528,22 @@ def kpi_row():
 
 
 def detail_view(sym):
+    # 失败记录重跑：?rerun=<run_id> 触发，复用原记录、不新建决策
+    _rq = st.query_params.get("rerun")
+    if _rq:
+        del st.query_params["rerun"]
+        try:
+            _rid = int(_rq)
+        except (TypeError, ValueError):
+            _rid = None
+        _rr = db.get_run(conn, _rid) if _rid else None
+        if (_rr and _rr.ticker == sym and _rr.status == "failed"
+                and sym not in st.session_state.pending_analysis_symbols):
+            db.reset_run(conn, _rid)  # 先同步置回 running，避免渲染竞态闪"失败"卡
+            start_background_analysis(sym, run_id=_rid, trade_date=_rr.trade_date)
+            st.toast(f"正在重跑 {sym} · {_rr.trade_date}（复用原记录，不新增决策）")
+        st.rerun()
+
     r = latest[sym]
     rows = db.get_runs(conn, ticker=sym, limit=200)
     if st.session_state.analysis_delete_symbol != sym:
@@ -3369,7 +3575,7 @@ def detail_view(sym):
             with st.container(key="t24_analysis_filter"):
                 filter_left, filter_right = st.columns([1.1, .9], vertical_alignment="center")
                 filter_left.markdown(
-                    "<div class='caps'>分析标的</div>",
+                    "<div class='caps caps-field'>分析标的</div>",
                     unsafe_allow_html=True,
                 )
                 selected_sym = filter_right.selectbox(
@@ -3404,6 +3610,10 @@ def detail_view(sym):
             f"{html_safe(token_cost_text(r))}</div></div></div>"
         )
         st.markdown(hero, unsafe_allow_html=True)
+
+        plan_html = plan_strip_html(r)
+        if plan_html:
+            st.markdown(plan_html, unsafe_allow_html=True)
 
         st.markdown("<div class='caps' style='margin-bottom:8px;'>Price Action · Decisions</div>",
                     unsafe_allow_html=True)
@@ -3495,6 +3705,14 @@ def detail_view(sym):
                 accent = decision_accent(item.decision)
                 can_expand = item.status == "success"
                 decision_open_attr = " open" if r and item.id == r.id and can_expand else ""
+                if item.status == "failed" and item.id is not None:
+                    # 失败记录：灰色决策位换成「重跑」，复用原记录、不新增决策
+                    chip = (f"<a class='t24-decision-chip t24-rerun-chip' "
+                            f"href='?p=analysis&t={quote(str(sym), safe='')}&rerun={int(item.id)}' "
+                            f"target='_self'>重跑</a>")
+                else:
+                    chip = (f"<span class='t24-decision-chip'>"
+                            f"{html_safe(decision_label(item.decision))}</span>")
                 history_html += f"<details class='t24-decision-item'{decision_open_attr}>"
                 history_html += (
                     f"<summary style='--decision:{accent};'><div class='t24-decision-row'>"
@@ -3504,7 +3722,7 @@ def detail_view(sym):
                     f"<div class='t24-decision-sub'>{html_safe(run_display_no(item))} · "
                     f"{html_safe(status_label(item.status))}</div>"
                     f"</div></div>"
-                    f"<span class='t24-decision-chip'>{html_safe(decision_label(item.decision))}</span>"
+                    f"{chip}"
                     f"<span class='t24-decision-chevron'>{icon('chevron', 14)}</span>"
                     f"</div></summary>"
                 )
@@ -3584,6 +3802,56 @@ def overview():
     ][:5]
     run_word = "分析进行中" if running else ("今日已完成" if done >= len(symbols) else "待运行")
 
+    # 今日运行 tile 的补充：每只标的的状态胶囊 + 今日成本
+    _state_color = {"done": "var(--t24-primary)", "running": "var(--t24-warning)",
+                    "failed": "var(--t24-danger)", "idle": "var(--t24-subtle)"}
+
+    def _sym_state(s: str) -> str:
+        r = latest[s]
+        if r and r.status == "running":
+            return "running"
+        if r and run_is_today(r) and r.status == "success":
+            return "done"
+        if r and run_is_today(r) and r.status == "failed":
+            return "failed"
+        return "idle"
+
+    run_chips = "".join(
+        f"<span class='t24-ov-chip'><i style='background:{_state_color[_sym_state(s)]};'></i>"
+        f"{html_safe(s)}</span>"
+        for s in symbols)
+    today_cost = sum((r.cost_usd or 0) for r in db.get_runs(conn, limit=50)
+                     if r.status == "success" and run_is_today(r))
+    cost_note = (f"<div class='t24-ov-tile-note'>今日成本 ${today_cost:.2f}</div>"
+                 if today_cost > 0 else "")
+
+    # 今日决策分布 tile 的补充：比例条 + 各方向标的
+    dec_syms = {"BUY": [], "HOLD": [], "SELL": []}
+    for s in symbols:
+        r = latest[s]
+        if r and run_is_today(r) and r.status == "success":
+            d = _norm_decision(r.decision)
+            if d in dec_syms:
+                dec_syms[d].append(s)
+    total_dec = buys + holds + sells
+    if total_dec:
+        _seg = "".join(
+            f"<span style='width:{n / total_dec * 100:.1f}%;background:{c};'></span>"
+            for n, c in ((buys, "var(--t24-primary)"), (holds, "var(--t24-subtle)"),
+                         (sells, "var(--t24-danger)")) if n)
+        dist_bar = f"<div class='t24-ov-dist-bar'>{_seg}</div>"
+        _rows = []
+        for key, lab, color in (("BUY", "增持", "var(--t24-primary)"),
+                                ("SELL", "减持", "var(--t24-danger)"),
+                                ("HOLD", "中性", "var(--t24-muted)")):
+            if dec_syms[key]:
+                _rows.append(f"<div class='t24-ov-dist-row'><span style='color:{color};'>"
+                             f"{lab}</span> · {html_safe('、'.join(dec_syms[key]))}</div>")
+        dist_detail = "".join(_rows)
+    else:
+        dist_bar = "<div class='t24-ov-dist-bar'></div>"
+        dist_detail = "<div class='t24-ov-dist-row'>今日暂未产出决策，跑完批量后在此汇总</div>"
+
     st.markdown(
         "<div class='t24-page-head'>"
         "<div><div class='t24-headline'>关注列表总览</div>"
@@ -3622,12 +3890,14 @@ def overview():
         f"<div style='display:flex;align-items:baseline;gap:6px;'>"
         f"<span class='t24-data' style='font-size:24px;color:var(--t24-text);'>{done}</span>"
         f"<span class='t24-data' style='font-size:14px;color:var(--t24-muted);'>/ {len(symbols)} 已完成</span></div>"
-        f"<div class='t24-progress' style='--value:{pct}%;margin:8px 0 0;'><span></span></div></div>"
+        f"<div class='t24-progress' style='--value:{pct}%;margin:8px 0 0;'><span></span></div>"
+        f"<div class='t24-ov-chiprow'>{run_chips}</div>{cost_note}</div>"
         f"<div class='t24-ov-tile'><div class='t24-ov-tile-label'>今日决策分布</div>"
         f"<div class='t24-data' style='display:flex;gap:16px;font-size:13px;'>"
         f"<span style='color:var(--t24-primary);'>● 增持 {buys}</span>"
         f"<span style='color:var(--t24-muted);'>● 中性 {holds}</span>"
-        f"<span style='color:var(--t24-danger);'>● 减持 {sells}</span></div></div>"
+        f"<span style='color:var(--t24-danger);'>● 减持 {sells}</span></div>"
+        f"{dist_bar}{dist_detail}</div>"
         f"<div class='t24-ov-tile'><div class='t24-ov-tile-label'>近期提醒</div>{alert_body}</div>"
         "</div>",
         unsafe_allow_html=True,
@@ -3655,6 +3925,7 @@ def overview():
             f"</div>"
             f"{_sparkline_svg(sym)}"
             f"{concl}"
+            f"{plan_line_html(r)}"
             f"<div class='t24-ov-foot'><span class='t24-ov-foot-age'>{html_safe(run_age(r))}</span>"
             f"<span class='t24-ov-foot-cta'>查看分析 →</span></div>"
             f"</a>"
@@ -3816,7 +4087,7 @@ def _add_ticker_dialog(rt: str, tickers: list) -> None:
     st.caption("填 0 表示不启用该预警阈值。")
     c = st.columns(2)
     if c[0].button("添加并校验数据源", type="primary", width="stretch", key="add_dlg_go"):
-        s = sym.strip().upper()
+        s = normalize_new_ticker(sym)
         if not s:
             st.error("请填写代码")
             return
@@ -4000,6 +4271,7 @@ def _new_ai_thread(title: str = "新对话", run_override: list[int] | None = No
     thread = {
         "title": title,
         "pinned_syms": [],          # @ 引用后钉进会话的标的，对后续轮次持续生效
+        "pinned_run_ids": [],       # @ 引用的具体决策（run 级），对后续轮次持续生效
         "excluded_syms": [],        # 从跟随页面基础范围移除的标的
         "run_override": [int(x) for x in (run_override or [])],  # 「发给 AI」固定记录
         "messages": [],
@@ -4013,6 +4285,7 @@ def _new_ai_thread(title: str = "新对话", run_override: list[int] | None = No
 
 def _normalize_ai_thread(t):
     t.setdefault("pinned_syms", [])
+    t.setdefault("pinned_run_ids", [])
     t.setdefault("excluded_syms", [])
     t.setdefault("run_override", [])
     return t
@@ -4055,6 +4328,10 @@ def thread_run_ids(thread) -> list[int]:
         rid = _latest_success_run_id(s)
         if rid is not None:
             ids.append(rid)
+    # @ 引用的具体决策（run 级）追加进上下文
+    for rid in (thread.get("pinned_run_ids") or []):
+        if rid not in ids and run_by_id(rid):
+            ids.append(rid)
     return ids
 
 
@@ -4086,12 +4363,21 @@ def _ai_mention_options(thread) -> list[dict]:
         rank = 0 if s == detail else (1 if s in scope_now else 2)
         tag = "本页" if s == detail else ("范围内" if s in scope_now else "")
         ts = run_timestamp(r)
+        # 该标的的历史决策（二级菜单，可多选），最新在前，最多 10 条
+        runs_list = [
+            {"date": x.trade_date,
+             "decision": BADGE.get(_norm_decision(x.decision), ("", "—"))[1],
+             "age": run_age(x), "latest": x.id == r.id}
+            for x in db.get_runs(conn, ticker=s, limit=30)
+            if x.status == "success"
+        ][:10]
         rows.append((rank, -(ts.timestamp() if ts else 0), {
             "sym": s,
             "name": names.get(s, s),
             "decision": BADGE.get(_norm_decision(r.decision), ("", "—"))[1],
             "age": run_age(r),
             "tag": tag,
+            "runs": runs_list,
         }))
     rows.sort(key=lambda x: (x[0], x[1]))
     return [x[2] for x in rows]
@@ -4107,6 +4393,20 @@ def _parse_ai_mentions(text: str) -> list[str]:
     return found
 
 
+def _parse_ai_run_mentions(text: str) -> dict[str, list[int]]:
+    """解析 @代码(yyyy-mm-dd) 形式的具体决策引用 → {sym: [run_id, ...]}。"""
+    out: dict[str, list[int]] = {}
+    for s in symbols:
+        for m in re.finditer("@" + re.escape(s) + r"\((\d{4}-\d{2}-\d{2})\)", text, re.I):
+            runs_ = [x for x in db.get_runs(conn, ticker=s, limit=100)
+                     if x.status == "success" and x.trade_date == m.group(1)]
+            if runs_:
+                out.setdefault(s, [])
+                if runs_[0].id not in out[s]:
+                    out[s].append(int(runs_[0].id))
+    return out
+
+
 def _queue_ai(prompt: str, thread) -> None:
     """入队一条提问：追加用户消息并标记 pending，流式回答在下一次渲染时进行。"""
     prompt = (prompt or "").strip()
@@ -4115,7 +4415,19 @@ def _queue_ai(prompt: str, thread) -> None:
     mention_labels = []
     if not thread.get("run_override"):
         current = set(thread_scope_syms(thread))
+        run_mentions = _parse_ai_run_mentions(prompt)
+        # 指定日期的决策引用：按 run 钉住（不连带钉整个标的，避免混入最新决策）
+        for s, rids in run_mentions.items():
+            pinned_runs = thread.setdefault("pinned_run_ids", [])
+            for rid in rids:
+                if rid not in pinned_runs:
+                    pinned_runs.append(rid)
+                run_ = run_by_id(rid)
+                if run_:
+                    mention_labels.append(f"@ {names.get(s, s)} · {run_.trade_date}")
         for s in _parse_ai_mentions(prompt):
+            if s in run_mentions:
+                continue  # 该标的已按具体决策引用
             # @ 过的标的钉进会话，对后续轮次持续生效；同时解除此前的移除
             if s not in thread["pinned_syms"]:
                 thread["pinned_syms"].append(s)
@@ -4315,6 +4627,36 @@ def render_ai_plugin():
     if not st.session_state.ai_panel_open:
         return
 
+    # 点击面板外任意位置 → 关闭（等价于点 ✕）。iframe 内(输入框/@菜单)的点击不冒泡，天然豁免。
+    # 注意：监听脚本必须注入父页面 realm——components.html 的 iframe 每次 rerun 都会
+    # 重建，在 iframe 里 addEventListener 的函数会随之失效。
+    components.html(
+        """<script>
+        (() => {
+          const doc = window.parent.document;
+          if (doc.getElementById("t24-ai-outside-script")) return;
+          const s = doc.createElement("script");
+          s.id = "t24-ai-outside-script";
+          s.textContent = `(() => {
+            if (window.__t24AiClickOutside) return;
+            window.__t24AiClickOutside = true;
+            document.addEventListener("mousedown", (e) => {
+              const panel = document.querySelector(".st-key-t24_ai_panel");
+              if (!panel) return;
+              const t = e.target;
+              if (t.closest(".st-key-t24_ai_panel")) return;
+              if (t.closest(".st-key-t24_ai_launcher")) return;
+              if (t.closest("[data-testid='stDialog']")) return;
+              const btn = document.querySelector(".st-key-ai_close button");
+              if (btn) btn.click();
+            }, true);
+          })();`;
+          doc.body.appendChild(s);
+        })();
+        </script>""",
+        height=0,
+    )
+
     thread = active_ai_thread()
     pending = st.session_state.ai_pending
     if pending and pending.get("thread_id") != thread["id"]:
@@ -4408,10 +4750,298 @@ def render_ai_plugin():
             st.rerun()
 
 
+def review():
+    """决策复盘 · 胜率：每个 AI 决策当一个信号，看 7天/30天后方向押对没有。"""
+    from trading24 import winrate
+
+    # 跟踪切换（点表格里的圆点，?track_toggle=<run_id>）
+    _tg = st.query_params.get("track_toggle")
+    if _tg:
+        del st.query_params["track_toggle"]
+        try:
+            _run = db.get_run(conn, int(_tg))
+        except (TypeError, ValueError):
+            _run = None
+        if _run:
+            db.set_run_tracked(conn, int(_run.id), not bool(getattr(_run, "win_tracked", 1)))
+        st.rerun()
+
+    signals, summary = winrate.evaluate(conn)
+
+    def _pct(x):
+        return "—" if x is None else f"{x * 100:+.1f}%"
+
+    st.markdown("<div class='t24-subhead'>决策复盘 · 胜率</div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='t24-muted'>把每个 AI 决策当作一个信号，看它 7 / 30 / 90 天后方向押对没有："
+        "增持押涨、减持押跌算对；中性不计胜负；未到期为待定。评级视野多为季度级，"
+        "90 天窗才是对评级最公平的判定，7 天窗仅衡量短期择时。"
+        "若报告给出硬止损且期间被触发，该窗直接判「破止损」（计划失败，计负），不再等到期。"
+        "一只股票的多次决策各算一个信号。</div>",
+        unsafe_allow_html=True)
+
+    for h in winrate.HORIZONS:
+        a = summary[h]["all"]
+        b_buy, b_sell = summary[h]["BUY"], summary[h]["SELL"]
+        wr = "—" if a["win_rate"] is None else f"{a['win_rate'] * 100:.0f}%"
+        buy_wr = "—" if b_buy["win_rate"] is None else f"{b_buy['win_rate'] * 100:.0f}%"
+        sell_wr = "—" if b_sell["win_rate"] is None else f"{b_sell['win_rate'] * 100:.0f}%"
+        st.markdown(f"<div class='t24-subhead' style='margin-top:14px'>{h} 天窗</div>",
+                    unsafe_allow_html=True)
+        cols = st.columns(4)
+        kpi_card(cols[0], "总胜率", wr, f"已判定 {a['n_decided']} · 待定 {a['pending']}")
+        kpi_card(cols[1], "胜 / 负 / 平", f"{a['wins']} / {a['losses']} / {a['flats']}",
+                 f"平均方向收益 {_pct(a['avg_dir_ret'])}")
+        kpi_card(cols[2], "增持胜率", buy_wr, f"押对 {b_buy['wins']}/{b_buy['n_decided']}")
+        kpi_card(cols[3], "减持胜率", sell_wr, f"押对 {b_sell['wins']}/{b_sell['n_decided']}")
+
+    st.markdown("<div class='t24-subhead' style='margin-top:18px'>逐决策明细</div>",
+                unsafe_allow_html=True)
+    st.markdown(
+        "<div class='t24-muted'>点「跟踪」圆点 = 切换该决策是否计入上方胜率（记录保留，随时可切回）。"
+        "点<b>表头</b>可排序/筛选（标的、决策、判定列支持按值勾选）。"
+        "入场价取决策日收盘，遇休市顺延（悬停入场价可见实际取价日）。</div>",
+        unsafe_allow_html=True)
+    if not signals:
+        st.info("还没有成功的决策记录。先在关注列表里跑一次分析。")
+        return
+
+    ordered = sorted(signals, key=lambda s: (s.trade_date, s.run_id or 0), reverse=True)
+
+    _TICKER_COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#8b5cf6",
+                      "#f43f5e", "#06b6d4", "#84cc16", "#fb923c"]
+    _VERDICT_CLS = {"胜": "win", "负": "loss", "破止损": "loss",
+                    "平": "flat", "中性": "flat", "待定": "pending"}
+
+    def _ret_html(v) -> str:
+        if v is None:
+            return "<span class='dim'>—</span>"
+        cls = "pos" if v > 0 else ("neg" if v < 0 else "dim")
+        return f"<span class='{cls}'>{v * 100:+.1f}%</span>"
+
+    body = ""
+    for s in ordered:
+        tcolor = (_TICKER_COLORS[symbols.index(s.ticker) % len(_TICKER_COLORS)]
+                  if s.ticker in symbols else "var(--t24-subtle)")
+        if s.plan_entry_low is not None or s.plan_entry_high is not None:
+            zlo = s.plan_entry_low if s.plan_entry_low is not None else s.plan_entry_high
+            zhi = s.plan_entry_high if s.plan_entry_high is not None else zlo
+            zone = _plan_num(zlo) if zlo == zhi else f"{_plan_num(zlo)}–{_plan_num(zhi)}"
+        else:
+            zone = "<span class='dim'>—</span>"
+        stop = f"{s.stop_price:.0f}" if s.stop_price is not None else "<span class='dim'>—</span>"
+        last = f"{s.last_price:.2f}" if s.last_price is not None else "<span class='dim'>—</span>"
+        entry_title = (f" title='入场日 {s.entry_date}'"
+                       if s.entry_date and s.entry_date != s.trade_date else "")
+        entry = f"{s.entry_price:.2f}" if s.entry_price is not None else "<span class='dim'>—</span>"
+        def _ds(v):
+            return "" if v is None else f"{v}"
+
+        win_cells = ""
+        for h in winrate.HORIZONS:
+            hr = s.horizons[h]
+            tip = (f" title='硬止损 {_plan_num(s.stop_price)} 已于 {s.stop_hit_date} 触发，"
+                   f"计划终止，各窗口定格为破止损'"
+                   if hr.verdict == "破止损" and s.stop_hit_date else "")
+            chip = (f"<span class='chip {_VERDICT_CLS.get(hr.verdict, 'flat')}'{tip}>"
+                    f"{hr.verdict}</span>")
+            ret = f"<span class='ret'>{_ret_html(hr.ret)}</span>" if hr.ret is not None else ""
+            win_cells += (f"<td data-sort='{_ds(hr.ret)}' data-val='{hr.verdict}'>"
+                          f"<div class='wcell'>{chip}{ret}</div></td>")
+        body += (
+            f"<tr class='{'' if s.tracked else 'untracked'}'>"
+            f"<td><a class='track{' on' if s.tracked else ''}' target='_self' "
+            f"data-rid='{s.run_id}' "
+            f"href='?p=review&track_toggle={s.run_id}' title='点击切换是否计入胜率'>"
+            f"{'✓' if s.tracked else ''}</a></td>"
+            f"<td data-sort='{html_safe(s.ticker)}' data-val='{html_safe(s.ticker)}'>"
+            f"<span class='dot' style='background:{tcolor};'></span>"
+            f"<span class='sym'>{html_safe(s.ticker)}</span></td>"
+            f"<td data-sort='{html_safe(s.trade_date)}'>{html_safe(s.trade_date)}</td>"
+            f"<td data-sort='{s.dir_label}' data-val='{s.dir_label}'>{badge(s.decision_raw)}</td>"
+            f"<td data-sort='{_ds(s.last_price)}'>{last}</td>"
+            f"<td data-sort='{_ds(s.entry_price)}'{entry_title}>{entry}</td>"
+            f"<td data-sort='{_ds(s.plan_entry_low)}'>{zone}</td>"
+            f"<td data-sort='{_ds(s.stop_price)}'>{stop}</td>"
+            f"<td data-sort='{_ds(s.live_ret)}'>{_ret_html(s.live_ret)}</td>"
+            f"{win_cells}</tr>")
+    header = "".join(f"<th>{h}</th>" for h in
+                     ["跟踪", "标的", "决策日", "决策", "最新价", "入场价",
+                      "建/减仓区", "止损", "至今", "7天", "30天", "90天"])
+    # 列宽管理（table-layout:fixed）：窄列给操作/日期，宽列给三个时间窗
+    colgroup = "<colgroup>" + "".join(
+        f"<col style='width:{w}%'>" for w in
+        (4.5, 9.5, 8.5, 7, 8, 8, 9.5, 6, 8, 10.3, 10.3, 10.4)) + "</colgroup>"
+    st.markdown(
+        f"<div class='t24-rt-wrap'><table class='t24-rt'>{colgroup}"
+        f"<thead><tr>{header}</tr></thead><tbody>{body}</tbody></table></div>",
+        unsafe_allow_html=True)
+
+    # 跟踪切换的软刷新通道：隐藏按钮（局部重跑），表格圆点由 JS 代理点击；
+    # JS 不可用时退回 href 的整页刷新兜底。
+    with st.container(key="t24_review_track_btns"):
+        for s in signals:
+            if s.run_id is None:
+                continue
+            if st.button(f"t{s.run_id}", key=f"track_btn_{s.run_id}"):
+                db.set_run_tracked(conn, int(s.run_id), not s.tracked)
+                st.rerun()
+    components.html(
+        """<script>
+        (() => {
+          const doc = window.parent.document;
+          if (!doc.getElementById("t24-track-script")) {
+            const s = doc.createElement("script");
+            s.id = "t24-track-script";
+            s.textContent = `(() => {
+              if (window.__t24TrackDelegate) return;
+              window.__t24TrackDelegate = true;
+              document.addEventListener("click", (e) => {
+                const a = e.target.closest(".t24-rt a.track");
+                if (!a) return;
+                const btn = document.querySelector(
+                  ".st-key-track_btn_" + a.getAttribute("data-rid") + " button");
+                if (btn) { e.preventDefault(); e.stopPropagation(); btn.click(); }
+              }, true);
+            })();`;
+            doc.body.appendChild(s);
+          }
+          if (!doc.getElementById("t24-rt-head-script")) {
+            const s2 = doc.createElement("script");
+            s2.id = "t24-rt-head-script";
+            s2.textContent = `(() => {
+              if (window.__t24RtHead) return;
+              window.__t24RtHead = true;
+              const KEY = "t24rtState";
+              const FILTERABLE = new Set([1, 3, 9, 10, 11]);  // 标的/决策/7天/30天/90天
+              let state = {};
+              try { state = JSON.parse(sessionStorage.getItem(KEY)) || {}; } catch (e) {}
+              let menu = null;
+              let mo = null;
+              const table = () => document.querySelector(".t24-rt");
+              const save = () => sessionStorage.setItem(KEY, JSON.stringify(state));
+              const val = (tr, c) => { const td = tr.children[c]; if (!td) return "";
+                const d = td.getAttribute("data-sort"); return d !== null ? d : td.textContent.trim(); };
+              const disp = (tr, c) => { const td = tr.children[c]; if (!td) return "";
+                return (td.getAttribute("data-val") || td.textContent).trim(); };
+
+              function apply() {
+                const t = table(); if (!t || !t.tBodies[0]) return;
+                if (mo) mo.disconnect();   // 自己引发的 DOM 变化不要再触发自己(否则每帧重排,点击失效)
+                const rows = Array.from(t.tBodies[0].rows);
+                const filters = state.filters || {};
+                rows.forEach(r => {
+                  let show = true;
+                  for (const c in filters) {
+                    const allow = filters[c];
+                    if (allow && allow.length && !allow.includes(disp(r, +c))) { show = false; break; }
+                  }
+                  r.style.display = show ? "" : "none";
+                });
+                if (state.sort) {
+                  const { col, dir } = state.sort, m = dir === "asc" ? 1 : -1;
+                  rows.sort((a, b) => {
+                    const va = val(a, col), vb = val(b, col);
+                    if (va === "" && vb === "") return 0;
+                    if (va === "") return 1;            // 空值永远最后
+                    if (vb === "") return -1;
+                    const na = parseFloat(va), nb = parseFloat(vb);
+                    if (!isNaN(na) && !isNaN(nb)) return (na - nb) * m;
+                    return va.localeCompare(vb) * m;
+                  });
+                  rows.forEach(r => t.tBodies[0].appendChild(r));
+                }
+                if (t.tHead) Array.from(t.tHead.rows[0].cells).forEach((th, i) => {
+                  th.removeAttribute("data-sorted"); th.removeAttribute("data-filtered");
+                  if (state.sort && state.sort.col === i) th.setAttribute("data-sorted", state.sort.dir);
+                  const f = filters[i]; if (f && f.length) th.setAttribute("data-filtered", "1");
+                });
+                if (mo) { mo.takeRecords();
+                  mo.observe(document.body, { childList: true, subtree: true }); }
+              }
+
+              function closeMenu() { if (menu) { menu.remove(); menu = null; } }
+
+              function openMenu(th, col) {
+                closeMenu();
+                const t = table();
+                menu = document.createElement("div");
+                menu.className = "t24-rt-menu";
+                const r = th.getBoundingClientRect();
+                menu.style.left = Math.min(r.left, window.innerWidth - 210) + "px";
+                menu.style.top = (r.bottom + 4) + "px";
+                const item = (label, on, fn) => {
+                  const b = document.createElement("button");
+                  b.className = "t24-rtm-item" + (on ? " on" : "");
+                  b.textContent = label; b.onclick = fn; return b;
+                };
+                const isS = d => state.sort && state.sort.col === col && state.sort.dir === d;
+                menu.append(
+                  item("↑ 升序", isS("asc"), () => { state.sort = { col, dir: "asc" }; save(); apply(); closeMenu(); }),
+                  item("↓ 降序", isS("desc"), () => { state.sort = { col, dir: "desc" }; save(); apply(); closeMenu(); }));
+                if (FILTERABLE.has(col)) {
+                  const sep = document.createElement("div"); sep.className = "t24-rtm-sep"; menu.append(sep);
+                  const cap = document.createElement("div"); cap.className = "t24-rtm-cap"; cap.textContent = "筛选"; menu.append(cap);
+                  const values = [...new Set(Array.from(t.tBodies[0].rows).map(x => disp(x, col)))];
+                  const cur = (state.filters || {})[col];
+                  values.forEach(v => {
+                    const lab = document.createElement("label"); lab.className = "t24-rtm-check";
+                    const cb = document.createElement("input"); cb.type = "checkbox";
+                    cb.checked = !cur || !cur.length || cur.includes(v);
+                    cb.onchange = () => {
+                      const on = Array.from(menu.querySelectorAll(".t24-rtm-check input"))
+                        .map((c, i) => c.checked ? values[i] : null).filter(x => x !== null);
+                      state.filters = state.filters || {};
+                      if (on.length === values.length) delete state.filters[col];
+                      else state.filters[col] = on;
+                      save(); apply();
+                    };
+                    lab.append(cb, document.createTextNode(v)); menu.append(lab);
+                  });
+                }
+                const sep2 = document.createElement("div"); sep2.className = "t24-rtm-sep"; menu.append(sep2);
+                menu.append(item("↺ 恢复默认", false, () => {
+                  delete state.sort;
+                  if (state.filters) delete state.filters[col];
+                  save(); closeMenu();
+                  location.reload();   // 恢复服务端默认顺序最干净
+                }));
+                document.body.appendChild(menu);
+              }
+
+              document.addEventListener("click", (e) => {
+                const th = e.target.closest(".t24-rt thead th");
+                if (th) {
+                  const col = Array.from(th.parentNode.children).indexOf(th);
+                  if (col === 0) return;   // 跟踪列不出菜单
+                  e.stopPropagation(); openMenu(th, col); return;
+                }
+                if (menu && !e.target.closest(".t24-rt-menu")) closeMenu();
+              }, true);
+
+              // Streamlit 重跑重建表格后自动重放排序/筛选
+              let raf = 0;
+              mo = new MutationObserver(() => {
+                if (raf) return;
+                raf = requestAnimationFrame(() => { raf = 0; apply(); });
+              });
+              mo.observe(document.body, { childList: true, subtree: true });
+              apply();
+            })();`;
+            doc.body.appendChild(s2);
+          }
+        })();
+        </script>""",
+        height=0,
+    )
+
+
 # ---- 路由 ----
 view = st.session_state.view
 if view == "管理关注列表":
     manage()
+elif view == "复盘":
+    review()
 elif st.session_state.detail:
     detail_view(st.session_state.detail)
 else:

@@ -82,10 +82,12 @@ def _run_streamed(ta, ticker: str, trade_date: str, conn, run_id: int):
 
 
 def run_one(ticker: str, trade_date: str, settings: Settings | None = None,
-            conn=None, analysts: list[str] | None = None) -> int:
+            conn=None, analysts: list[str] | None = None,
+            run_id: int | None = None) -> int:
     """跑一家公司并落库，返回 run_id。异常时标记 failed 并向上抛。
 
     analysts: 选择参与的分析师子集，None 时用 settings.analysts。
+    run_id: 传入时复用该记录重跑（典型：失败重试），不新建决策记录。
     """
     settings = settings or load_settings()
     analysts = analysts or settings.analysts
@@ -95,7 +97,10 @@ def run_one(ticker: str, trade_date: str, settings: Settings | None = None,
         db.init_db(conn)
 
     market = market_of(ticker)
-    run_id = db.create_run(conn, ticker, market, trade_date, settings.deep_think_llm)
+    if run_id is None:
+        run_id = db.create_run(conn, ticker, market, trade_date, settings.deep_think_llm)
+    else:
+        db.reset_run(conn, run_id, settings.deep_think_llm)
 
     try:
         from tradingagents.graph.trading_graph import TradingAgentsGraph
@@ -120,6 +125,16 @@ def run_one(ticker: str, trade_date: str, settings: Settings | None = None,
         cost = stats.cost(settings.price_per_1m_input, settings.price_per_1m_output)
         db.finish_run(conn, run_id, decision=str(decision).strip(),
                       tokens=stats.tokens, cost_usd=round(cost, 4))
+
+        # 决策参数结构化提取（止损/建仓区/仓位等，复盘用；quick 模型，约 $0.001）
+        try:
+            from . import extract
+            final_text = final_state.get("final_trade_decision") if final_state else None
+            params = extract.extract_decision_params(final_text)
+            if params:
+                db.upsert_decision_params(conn, run_id, params, model=settings.quick_think_llm)
+        except Exception:  # noqa: BLE001  提取失败不影响主流程
+            pass
         return run_id
     except Exception as e:  # noqa: BLE001
         db.fail_run(conn, run_id, e)

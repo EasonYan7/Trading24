@@ -1,0 +1,17 @@
+# 可选：SQLite → Cloudflare R2 持续备份（point-in-time 恢复）。
+# 需要先在 .env 里配好下面这几个 LITESTREAM_R2_* 变量，再用：
+#   docker compose --profile backup up -d litestream
+# 恢复：litestream restore -o /app/data/trading24.sqlite s3://<bucket>/trading24
+#
+# litestream 会自动展开 ${...} 环境变量。
+dbs:
+  - path: /app/data/trading24.sqlite
+    replicas:
+      - type: s3
+        endpoint: ${LITESTREAM_R2_ENDPOINT}      # https://<accountid>.r2.cloudflarestorage.com
+        bucket: ${LITESTREAM_R2_BUCKET}
+        path: trading24
+        region: auto
+        access-key-id: ${LITESTREAM_R2_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_R2_SECRET_ACCESS_KEY}
+        force-path-style: true

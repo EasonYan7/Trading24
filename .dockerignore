@@ -1,0 +1,28 @@
+# 构建上下文瘦身 + 防止密钥/数据被打进镜像。
+
+# 密钥绝不进镜像（运行期由 compose 的 env_file 注入）
+.env
+.env.*
+!.env.example
+
+# 运行时数据 / 数据库：由挂载卷提供，不烘进镜像
+data/
+
+# 本地虚拟环境 / 版本库 / 缓存
+.venv/
+.git/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# 设计资料 / 审计 / 演示，运行期用不到
+audits/
+_typeui/
+stitch_premium_product_interface_design*/
+scratchpad/
+
+# 杂项
+.claude/
+*.log
+.DS_Store

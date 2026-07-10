@@ -28,7 +28,15 @@ def connect(db_path: Path | None = None, check_same_thread: bool = True) -> sqli
 
 def init_db(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA.read_text())
+    _migrate(conn)
     conn.commit()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """轻量迁移：给旧库补列（CREATE TABLE IF NOT EXISTS 不会改已存在的表）。"""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(runs)").fetchall()}
+    if "win_tracked" not in cols:
+        conn.execute("ALTER TABLE runs ADD COLUMN win_tracked INTEGER DEFAULT 1")
 
 
 # ---- runs ----
@@ -56,6 +64,50 @@ def fail_run(conn, run_id, error) -> None:
         (now_iso(), str(error)[:1000], run_id),
     )
     conn.commit()
+
+
+def reset_run(conn, run_id: int, model: str | None = None) -> None:
+    """复用已有记录重跑（典型：失败重试）：清空产物、置回 running。
+    不新建决策记录——run_id 及其在历史里的位置保持不变。"""
+    conn.execute(
+        "UPDATE runs SET status='running', started_at=?, finished_at=NULL, "
+        "error=NULL, decision=NULL, tokens=0, cost_usd=0, model=COALESCE(?, model) "
+        "WHERE id=?",
+        (now_iso(), model, run_id),
+    )
+    conn.execute("DELETE FROM reports WHERE run_id=?", (run_id,))
+    conn.execute("DELETE FROM decision_params WHERE run_id=?", (run_id,))
+    conn.commit()
+
+
+def set_run_tracked(conn, run_id: int, tracked: bool) -> None:
+    """标记某次决策是否纳入胜率统计。记录本身保留，可随时切回。"""
+    conn.execute("UPDATE runs SET win_tracked=? WHERE id=?", (1 if tracked else 0, run_id))
+    conn.commit()
+
+
+# ---- decision_params（final 报告的结构化提取）----
+_DP_COLS = ("stop_loss", "entry_low", "entry_high", "initial_position_pct",
+            "max_position_pct", "price_target", "time_horizon", "time_horizon_days")
+
+
+def upsert_decision_params(conn, run_id: int, params: dict, model: str | None = None) -> None:
+    vals = [params.get(c) for c in _DP_COLS]
+    conn.execute(
+        f"""INSERT INTO decision_params (run_id,{','.join(_DP_COLS)},model,extracted_at)
+        VALUES (?,{','.join('?' * len(_DP_COLS))},?,?)
+        ON CONFLICT(run_id) DO UPDATE SET
+        {','.join(f'{c}=excluded.{c}' for c in _DP_COLS)},
+        model=excluded.model, extracted_at=excluded.extracted_at""",
+        [run_id, *vals, model, now_iso()],
+    )
+    conn.commit()
+
+
+def get_decision_params(conn, run_id: int) -> dict | None:
+    row = conn.execute(
+        "SELECT * FROM decision_params WHERE run_id=?", (run_id,)).fetchone()
+    return dict(row) if row else None
 
 
 def get_runs(conn, ticker=None, limit=100) -> list[Run]:

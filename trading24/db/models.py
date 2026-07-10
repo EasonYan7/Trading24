@@ -18,6 +18,7 @@ class Run:
     tokens: int = 0
     cost_usd: float = 0.0
     error: str | None = None
+    win_tracked: int = 1
 
 
 @dataclass

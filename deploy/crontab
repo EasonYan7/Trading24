@@ -1,0 +1,8 @@
+# supercronic 定时表：每天按点跑一遍关注列表的批量分析。
+# 时区由容器的 TZ 决定（默认 Asia/Hong_Kong），建议与 config/watchlist.yaml 的 run_time 保持一致。
+# 改完时间后执行：docker compose restart scheduler
+#
+# ⚠️ 每次运行都会调用 DeepSeek，按只数产生费用（约 $0.08–0.10/只）。
+#
+# 分 时 日 月 周   命令
+  30  8 *  *  *   python scripts/run_batch.py

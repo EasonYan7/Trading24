@@ -57,6 +57,25 @@
   }
   .mention-item time { color: var(--subtle); font-size: 11px; flex: 0 0 auto; }
   .mention-item.selected, .mention-item:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+  .mention-item .chev { color: var(--subtle); flex: 0 0 auto; font-size: 12px; }
+  .mention-item .check {
+    flex: 0 0 auto; width: 15px; height: 15px; border-radius: 4px;
+    border: 1.5px solid var(--border-strong); display: inline-flex;
+    align-items: center; justify-content: center; font-size: 11px; line-height: 1;
+    color: var(--primary-text); background: transparent;
+  }
+  .mention-item.checked .check { background: var(--primary); border-color: var(--primary); }
+  .mention-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 11px; border-top: 1px solid var(--border);
+    color: var(--subtle); font-size: 11px;
+  }
+  .mention-foot button {
+    font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+    border: 0; border-radius: 8px; padding: 4px 12px;
+    background: var(--primary); color: var(--primary-text);
+  }
+  .mention-foot button:disabled { opacity: .4; cursor: default; }
 
   .composer-box {
     border: 1px solid var(--border-strong);
@@ -127,11 +146,14 @@
   const send = document.getElementById("send");
   const form = document.getElementById("form");
 
-  let stocks = [];        // [{sym, name, decision, age, tag}] 已按优先级排序
-  let items = [];         // 当前过滤结果
+  let stocks = [];        // [{sym, name, decision, age, tag, runs:[{date,decision,age,latest}]}]
+  let items = [];         // 当前过滤结果（一级）
   let index = 0;
   let mentionStart = -1;
   let disabled = false;
+  // 二级（决策多选）状态：drill=当前股票对象，checked=选中的 run 下标集合
+  let drill = null;
+  let checked = new Set();
 
   const BASE_H = 96;
 
@@ -153,14 +175,17 @@
     menu.classList.remove("open");
     items = [];
     mentionStart = -1;
+    drill = null;
+    checked = new Set();
     syncHeight();
   }
 
   function renderMenu() {
+    if (drill) { renderDrill(); return; }
     menu.innerHTML = "";
     const head = document.createElement("div");
     head.className = "mention-head";
-    head.textContent = "引用标的数据作为背景(↑↓ 选择,Enter 确认)";
+    head.textContent = "选择标的(↑↓ 选择,Enter 进入决策列表)";
     menu.appendChild(head);
     items.forEach(function (s, i) {
       const btn = document.createElement("button");
@@ -175,14 +200,81 @@
       }
       const t = document.createElement("time"); t.textContent = s.age;
       btn.appendChild(t);
-      btn.addEventListener("mousedown", function (e) { e.preventDefault(); pick(s.sym); });
+      const chev = document.createElement("span"); chev.className = "chev";
+      chev.textContent = (s.runs && s.runs.length > 1) ? "› " + s.runs.length + " 条决策" : "›";
+      btn.appendChild(chev);
+      btn.addEventListener("mousedown", function (e) { e.preventDefault(); enterDrill(s); });
       menu.appendChild(btn);
     });
     menu.classList.add("open");
     syncHeight();
   }
 
+  function enterDrill(s) {
+    if (!s.runs || s.runs.length <= 1) { pick(s.sym); return; }  // 只有一条决策：直接引用
+    drill = s;
+    checked = new Set();
+    index = 0;
+    renderDrill();
+  }
+
+  function renderDrill() {
+    menu.innerHTML = "";
+    const head = document.createElement("div");
+    head.className = "mention-head";
+    head.textContent = drill.sym + " · 选择决策(空格/点击 多选,Enter 确认,← 返回)";
+    menu.appendChild(head);
+    drill.runs.forEach(function (r, i) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mention-item" + (i === index ? " selected" : "") + (checked.has(i) ? " checked" : "");
+      const box = document.createElement("span"); box.className = "check";
+      box.textContent = checked.has(i) ? "✓" : "";
+      const name = document.createElement("span"); name.className = "name";
+      name.textContent = r.date + " · " + r.decision + (r.latest ? "（最新）" : "");
+      btn.append(box, name);
+      const t = document.createElement("time"); t.textContent = r.age;
+      btn.appendChild(t);
+      btn.addEventListener("mousedown", function (e) {
+        e.preventDefault();
+        if (checked.has(i)) checked.delete(i); else checked.add(i);
+        index = i;
+        renderDrill();
+      });
+      menu.appendChild(btn);
+    });
+    const foot = document.createElement("div");
+    foot.className = "mention-foot";
+    const info = document.createElement("span");
+    info.textContent = checked.size ? ("已选 " + checked.size + " 条") : "未选=引用最新一条";
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.textContent = "确认";
+    ok.addEventListener("mousedown", function (e) { e.preventDefault(); confirmDrill(); });
+    foot.append(info, ok);
+    menu.appendChild(foot);
+    menu.classList.add("open");
+    syncHeight();
+  }
+
+  function confirmDrill() {
+    if (!drill) return;
+    let tokens;
+    if (!checked.size) {
+      tokens = ["@" + drill.sym];               // 未选 = 引用最新
+    } else {
+      tokens = Array.from(checked).sort(function (a, b) { return a - b; })
+        .map(function (i) {
+          const r = drill.runs[i];
+          return r.latest ? "@" + drill.sym : "@" + drill.sym + "(" + r.date + ")";
+        });
+    }
+    insertTokens(tokens);
+  }
+
   function updateMenu() {
+    drill = null;  // 继续输入 → 退出二级，回到一级过滤
+    checked = new Set();
     const caret = input.selectionStart;
     const before = input.value.slice(0, caret);
     const m = before.match(/@([A-Za-z0-9.一-龥]*)$/);
@@ -197,12 +289,15 @@
     renderMenu();
   }
 
-  function pick(sym) {
+  function pick(sym) { insertTokens(["@" + sym]); }
+
+  function insertTokens(tokens) {
     const caret = input.selectionStart;
     const before = input.value.slice(0, mentionStart);
     const after = input.value.slice(caret);
-    input.value = before + "@" + sym + " " + after;
-    const pos = (before + "@" + sym + " ").length;
+    const inserted = tokens.join(" ") + " ";
+    input.value = before + inserted + after;
+    const pos = (before + inserted).length;
     input.setSelectionRange(pos, pos);
     closeMenu();
     input.focus();
@@ -223,9 +318,25 @@
 
   input.addEventListener("keydown", function (e) {
     if (menu.classList.contains("open")) {
-      if (e.key === "ArrowDown") { e.preventDefault(); index = (index + 1) % items.length; renderMenu(); return; }
-      if (e.key === "ArrowUp") { e.preventDefault(); index = (index - 1 + items.length) % items.length; renderMenu(); return; }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(items[index].sym); return; }
+      const n = drill ? drill.runs.length : items.length;
+      if (e.key === "ArrowDown") { e.preventDefault(); index = (index + 1) % n; renderMenu(); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); index = (index - 1 + n) % n; renderMenu(); return; }
+      if (drill) {
+        if (e.key === " ") {  // 空格切换勾选
+          e.preventDefault();
+          if (checked.has(index)) checked.delete(index); else checked.add(index);
+          renderDrill(); return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); confirmDrill(); return; }
+        if (e.key === "ArrowLeft" || e.key === "Backspace") {
+          e.preventDefault(); drill = null; checked = new Set(); index = 0; renderMenu(); return;
+        }
+        if (e.key === "Escape") { closeMenu(); return; }
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab" || e.key === "ArrowRight") {
+        e.preventDefault(); enterDrill(items[index]); return;
+      }
       if (e.key === "Escape") { closeMenu(); return; }
     }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {

@@ -2824,14 +2824,14 @@ requires-dist = [
     { name = "stockstats", specifier = ">=0.6.5" },
     { name = "streamlit", specifier = ">=1.40" },
     { name = "streamlit-sortables", specifier = ">=0.3.1" },
-    { name = "tradingagents", editable = "../../projects/tradingagents" },
+    { name = "tradingagents", editable = "/Users/didi/TradingAgents" },
     { name = "yfinance", specifier = ">=0.2.40" },
 ]
 
 [[package]]
 name = "tradingagents"
-version = "0.3.0"
-source = { editable = "../../projects/tradingagents" }
+version = "0.2.5"
+source = { editable = "/Users/didi/TradingAgents" }
 dependencies = [
     { name = "backtrader" },
     { name = "langchain-anthropic" },

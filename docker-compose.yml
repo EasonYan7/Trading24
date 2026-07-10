@@ -1,0 +1,56 @@
+name: trading24
+
+# 三个常驻服务：看板(dashboard) / 每日批量(scheduler) / 对外入口(cloudflared)。
+# 可选：litestream 把 SQLite 持续备份到 R2，用 `docker compose --profile backup up -d` 开启。
+
+services:
+  dashboard:
+    build: .
+    image: trading24:latest
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      TZ: ${TZ:-Asia/Hong_Kong}
+    volumes:
+      - ./data:/app/data        # SQLite + tradingagents 缓存/记忆，跨重启保留
+      - ./config:/app/config    # 看板"管理"页会写回 watchlist/settings.yaml
+    ports:
+      - "127.0.0.1:8501:8501"   # 仅本机可访问（调试用）；对外走 cloudflared，不暴露公网端口
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8501/_stcore/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  scheduler:
+    image: trading24:latest
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      TZ: ${TZ:-Asia/Hong_Kong}
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./deploy/crontab:/app/deploy/crontab:ro
+    command: ["supercronic", "/app/deploy/crontab"]
+    depends_on: [dashboard]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    # 令牌式隧道：在 Cloudflare Zero Trust 里创建隧道后把 token 填进 .env。
+    # 隧道的 Public hostname 指向 service: http://dashboard:8501
+    command: ["tunnel", "--no-autoupdate", "run", "--token", "${TUNNEL_TOKEN}"]
+    depends_on: [dashboard]
+
+  litestream:
+    image: litestream/litestream:latest
+    profiles: [backup]          # 默认不启动；`--profile backup` 才拉起
+    restart: unless-stopped
+    env_file: [.env]
+    volumes:
+      - ./data:/app/data
+      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+    command: ["replicate"]
