@@ -10,6 +10,11 @@ data/*
 data/*.log
 data/*.sqlite-wal
 data/*.sqlite-shm
+data/.last_price_refresh
+data/ta/
+
+# tradingagents 的产物/缓存/记忆（TRADINGAGENTS_RESULTS_DIR 等，见 Dockerfile）
+.tradingagents/
 
 # Python
 __pycache__/
@@ -19,6 +24,12 @@ __pycache__/
 # 系统 / 编辑器
 .DS_Store
 *.log
+.vscode/
+.idea/
 
 # Claude Code 本地运行日志
 .claude/dash.log
+
+# 部署产物（本地 docker/litestream 生成，不应随仓库同步）
+litestream/
+*.pid

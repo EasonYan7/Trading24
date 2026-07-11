@@ -6,7 +6,8 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { background: transparent; }
   body {
-    font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    /* 与站内正文一致的衬线字体（Streamlit serif 主题），代码/时间等数据仍用等宽 */
+    font-family: "Source Serif Pro", Georgia, "Times New Roman", "PingFang SC", "Microsoft YaHei", serif;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -44,7 +45,8 @@
     color: var(--text);
     cursor: pointer;
   }
-  .mention-item .sym { font-weight: 700; min-width: 72px; flex: 0 0 auto; }
+  .mention-item .sym { font-weight: 700; min-width: 72px; flex: 0 0 auto;
+    font-family: "Geist Mono", "SFMono-Regular", Menlo, monospace; font-size: 11.5px; }
   .mention-item .name { color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .mention-item .tag {
     flex: 0 0 auto;
@@ -55,7 +57,8 @@
     font-size: 10.5px;
     font-weight: 600;
   }
-  .mention-item time { color: var(--subtle); font-size: 11px; flex: 0 0 auto; }
+  .mention-item time { color: var(--subtle); font-size: 11px; flex: 0 0 auto;
+    font-family: "Geist Mono", "SFMono-Regular", Menlo, monospace; }
   .mention-item.selected, .mention-item:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
   .mention-item .chev { color: var(--subtle); flex: 0 0 auto; font-size: 12px; }
   .mention-item .check {

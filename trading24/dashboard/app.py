@@ -10,6 +10,7 @@ import importlib
 import json
 import os
 import re
+import subprocess
 import threading
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -1817,12 +1818,47 @@ a.t24-rerun-chip:hover {
   margin:4px 0 2px;
 }
 .t24-theme-switch { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 10px; }
-.t24-ai-msg { border:1px solid var(--t24-border); border-radius:10px; padding:8px 11px; margin:6px 0; background:var(--t24-surface); font-size:13px; line-height:1.55; }
-.t24-ai-msg.user { background:var(--t24-ai-user); border-color:var(--t24-border-strong); }
+/* 消息气泡：与站内卡片同语言（白卡+细边+12px 圆角），用户消息用主题色左侧竖条区分，
+   不再整块刷色——和总览/详情卡片保持一致的克制感 */
+.t24-ai-msg { border:1px solid var(--t24-border); border-radius:12px; padding:9px 12px;
+  margin:6px 0; background:var(--t24-surface); font-size:13px; line-height:1.55;
+  box-shadow:var(--t24-shadow); }
+.t24-ai-msg.user { border-left:3px solid var(--t24-primary);
+  background:color-mix(in srgb, var(--t24-primary) 4%, var(--t24-surface));
+  width:fit-content; max-width:90%; margin-left:auto; }   /* 短消息随内容收缩、靠右 */
 .t24-ai-msg.assistant { background:var(--t24-ai-assistant); border-color:var(--t24-border); }
+.t24-ai-msg { overflow-wrap:anywhere; }                    /* 长串不许顶破卡片 */
+.t24-ai-msg :is(ul,ol) { padding-left:1.3em !important; margin:.3em 0 .4em !important; }
+.t24-ai-msg pre { white-space:pre-wrap; word-break:break-word; max-width:100%; }
 .t24-ai-msg :is(p,li) { font-size:13px !important; line-height:1.55 !important; margin:.25em 0 !important; }
-.t24-ai-msg :is(h1,h2,h3,h4) { font-size:14px !important; font-weight:700 !important; margin:.45em 0 .2em !important; }
-.t24-ai-msg table { font-size:12px !important; }
+/* 回答内小标题(依据/操作建议)：站内 kicker 语言，等宽大写小字，与正文加粗拉开层级 */
+.t24-ai-msg :is(h1,h2,h3,h4) {
+  font-family:'Geist Mono','SFMono-Regular',Menlo,monospace !important;
+  font-size:11px !important; font-weight:700 !important;
+  text-transform:uppercase; letter-spacing:.05em;
+  color:var(--t24-muted) !important; margin:.75em 0 .3em !important; }
+.t24-ai-msg table { font-size:12px !important; display:block; max-width:100%; overflow-x:auto; }
+/* 元信息行：角色·时间 左，复制按钮 右（悬停显现） */
+.t24-ai-meta { display:flex; justify-content:space-between; align-items:center; }
+.t24-ai-copy { font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;
+  font-size:10px; color:var(--t24-muted); background:none; border:0; padding:0 2px;
+  cursor:pointer; opacity:0; transition:opacity .15s ease; }
+.t24-ai-msg:hover .t24-ai-copy { opacity:1; }
+.t24-ai-copy:hover { color:var(--t24-primary); }
+/* 头部行钉在面板顶部、输入框钉在底部；消息在中间滚动。
+   注意：sticky 必须挂在面板的“直接子级”包装层上——挂在更深的列容器上时，
+   其父包装只有一行高，sticky 没有活动空间（HANDOVER 坑#12 的机理）。 */
+.st-key-t24_ai_panel > div:has(.st-key-ai_threads_btn) {
+  position:sticky; top:0; z-index:6;
+  background:var(--t24-surface);
+  padding:10px 0 8px;
+  border-bottom:1px solid var(--t24-border);
+}
+.st-key-t24_ai_panel .st-key-ai_composer {
+  position:sticky; bottom:-12px; z-index:6;
+  background:var(--t24-surface);
+  padding:8px 0 12px;
+}
 .t24-ai-meta { font-family:'Geist Mono', 'SFMono-Regular', Menlo, monospace !important; font-size:10px; color:var(--t24-muted); margin-bottom:3px; }
 .t24-ai-title { font-size:15px; font-weight:700; color:var(--t24-text); height:30px; display:flex; align-items:center; margin:0; transform:translateY(-8px); }
 .t24-ai-scope { font-size:11px; margin:4px 0 6px; }
@@ -1890,28 +1926,20 @@ a.t24-rerun-chip:hover {
             padding: 10px 12px 6px;
             border-bottom: 1px solid var(--t24-border);
         }
-        /* 圆形 × 关闭按钮：悬浮固定在面板左缘外侧靠下，长对话滚动时始终可见 */
-        .st-key-t24_ai_panel .st-key-ai_close {
-            position: fixed;
-            right: 426px;             /* 面板 right:20px + width:392px + 间距 */
-            bottom: 96px;
-            width: 34px;
-            z-index: 2147483001;
-        }
+        /* 圆形 × 关闭按钮（头部最右；头部已 sticky 常驻，随时可点） */
         .st-key-ai_close button {
             border-radius: 50% !important;
-            width: 34px !important; min-width: 34px !important;
-            height: 34px !important; min-height: 34px !important;
-            padding: 0 !important; font-size: 15px !important;
-            border: 1px solid var(--t24-border-strong) !important;
-            box-shadow: var(--t24-shadow) !important;
-            background: var(--t24-surface) !important;
+            width: 30px !important; min-width: 30px !important;
+            height: 30px !important; min-height: 30px !important;
+            padding: 0 !important; font-size: 14px !important;
+            border: none !important; box-shadow: none !important;
+            background: color-mix(in srgb, currentColor 9%, transparent) !important;
             color: var(--t24-text) !important;
             display: flex !important; align-items: center !important; justify-content: center !important;
         }
         .st-key-ai_close button:hover {
-            background: var(--t24-surface-high) !important;
-            border: 1px solid var(--t24-border-strong) !important;
+            background: color-mix(in srgb, currentColor 18%, transparent) !important;
+            border: none !important; box-shadow: none !important;
             transform: none !important;
         }
         /* 头部图标按钮：新对话(加号) + 选择记录(列表) */
@@ -2023,6 +2051,7 @@ a.t24-rerun-chip:hover {
         .t24-ai-chip {
             border: 1px solid var(--t24-border); border-radius: 999px; padding: 2px 8px;
             color: var(--t24-muted); font-size: 11px; font-weight: 600;
+            font-family: 'Geist Mono', 'SFMono-Regular', Menlo, monospace;
         }
         .st-key-t24_ai_panel iframe { display: block; }
         [class*="st-key-ai_sugg_"] button {
@@ -2043,11 +2072,6 @@ a.t24-rerun-chip:hover {
             .st-key-t24_ai_panel {
                 left: 12px; right: 12px; width: auto;
                 bottom: 12px; max-height: calc(100vh - 24px);
-            }
-            /* 小屏：悬浮关闭按钮回到头部行内（面板全宽，左缘外没有空间） */
-            .st-key-t24_ai_panel .st-key-ai_close {
-                position: static;
-                width: auto;
             }
             /* 小屏禁止面板内 columns 堆叠：头部按钮保持一行 */
             .st-key-t24_ai_panel [data-testid="stHorizontalBlock"]:has(.st-key-ai_threads_btn) {
@@ -2670,7 +2694,11 @@ def _ai_chat_request(prompt: str, context_text: str, history: list | None):
         "role": "system",
         "content": (
             "你是 Trading24 的投资分析助手。基于下面提供的历史分析记录和与用户的对话回答；"
-            "如果记录不足以支持结论，要明确说明缺口。回答使用中文，先给结论，再给依据和风险。"
+            "如果记录不足以支持结论，要明确说明缺口。回答使用中文，先给结论，再给依据和风险。\n"
+            "【硬性规则】上下文可能同时包含多只标的、多个日期的报告：任何价位、区间、"
+            "止损、目标价等数字只能用于它所属的那只标的，严禁把 A 标的报告里的点位套到 "
+            "B 标的上；引用数字前先核对它与该标的当前价格的量级是否一致；"
+            "如需引用非当前询问标的的内容，必须明确写出该标的名称。"
             f"\n\n可参考的分析记录：\n{context_text}"
         ),
     }]
@@ -3221,95 +3249,143 @@ def _model_choices(provider: str, mode: str, current: str | None) -> list[str]:
     return opts
 
 
+def _launchd_installed() -> bool:
+    """检测每日批量的定时任务(launchd)是否已装在本机。"""
+    try:
+        out = subprocess.run(["launchctl", "list"], capture_output=True,
+                             text=True, timeout=3).stdout
+        return "ai.trading24.batch" in out
+    except Exception:  # noqa: BLE001  非 macOS / 命令失败 → 视为未安装
+        return False
+
+
 @st.dialog("设置", width="large")
 def render_settings_dialog() -> None:
     s = load_settings()
-    st.markdown("<div class='t24-set-sec'>分析引擎（通用配置）</div>", unsafe_allow_html=True)
+    tab_engine, tab_ops = st.tabs(["分析引擎", "运行与成本"])
 
-    prov_idx = PROVIDER_KEYS.index(s.llm_provider) if s.llm_provider in PROVIDER_KEYS else 4
-    provider = st.selectbox(
-        "LLM 供应商", PROVIDER_KEYS, index=prov_idx,
-        format_func=lambda k: PROVIDER_LABEL.get(k, k), key="set_provider",
-    )
-
-    mc = st.columns(2)
-    with mc[0]:
-        deep = _model_field("深思考模型", provider, "deep", s.deep_think_llm, "deep")
-    with mc[1]:
-        quick = _model_field("快思考模型", provider, "quick", s.quick_think_llm, "quick")
-
-    default_url = PROVIDER_DEFAULT_URL.get(provider) or ""
-    url_seed = s.backend_url if provider == s.llm_provider else default_url
-    backend_url = st.text_input(
-        "接口地址 backend_url", value=url_seed or "",
-        key=f"set_url_{provider}", placeholder=default_url or "该供应商无需自定义地址",
-    ) or None
-
-    dc = st.columns(2)
-    with dc[0]:
-        depth_vals = [v for _, v in DEPTH_OPTIONS]
-        depth_idx = depth_vals.index(s.max_debate_rounds) if s.max_debate_rounds in depth_vals else 0
-        depth = st.radio(
-            "研究深度", DEPTH_OPTIONS, index=depth_idx,
-            format_func=lambda o: o[0], key="set_depth",
-        )[1]
-    with dc[1]:
-        lang_keys = [k for k, _ in LANGUAGE_OPTIONS]
-        lang_idx = lang_keys.index(s.output_language) if s.output_language in lang_keys else 1
-        output_language = st.selectbox(
-            "报告输出语言", lang_keys, index=lang_idx,
-            format_func=lambda k: dict(LANGUAGE_OPTIONS).get(k, k), key="set_lang",
+    # ── Tab 1：分析引擎 ─────────────────────────────────────
+    with tab_engine:
+        prov_idx = PROVIDER_KEYS.index(s.llm_provider) if s.llm_provider in PROVIDER_KEYS else 4
+        provider = st.selectbox(
+            "LLM 供应商", PROVIDER_KEYS, index=prov_idx,
+            format_func=lambda k: PROVIDER_LABEL.get(k, k), key="set_provider",
         )
+        mc = st.columns(2)
+        with mc[0]:
+            deep = _model_field("深思考模型", provider, "deep", s.deep_think_llm, "deep")
+        with mc[1]:
+            quick = _model_field("快思考模型", provider, "quick", s.quick_think_llm, "quick")
 
-    analysts = st.multiselect(
-        "分析师团队", [k for k, _ in ANALYST_OPTIONS],
-        default=[a for a in s.analysts if a in ANALYST_LABEL] or [k for k, _ in ANALYST_OPTIONS],
-        format_func=lambda k: ANALYST_LABEL.get(k, k), key="set_analysts",
-    )
-
-    with st.expander("数据源（高级）"):
-        vendors = {}
-        for vk, vlabel in VENDOR_FIELDS:
-            vendors[vk] = st.text_input(
-                vlabel, value=(s.data_vendors or {}).get(vk, "yfinance"), key=f"set_vendor_{vk}",
+        dc = st.columns(2)
+        with dc[0]:
+            depth_vals = [v for _, v in DEPTH_OPTIONS]
+            depth_idx = depth_vals.index(s.max_debate_rounds) if s.max_debate_rounds in depth_vals else 0
+            depth = st.radio(
+                "研究深度", DEPTH_OPTIONS, index=depth_idx,
+                format_func=lambda o: o[0], key="set_depth",
+            )[1]
+        with dc[1]:
+            lang_keys = [k for k, _ in LANGUAGE_OPTIONS]
+            lang_idx = lang_keys.index(s.output_language) if s.output_language in lang_keys else 1
+            output_language = st.selectbox(
+                "报告输出语言", lang_keys, index=lang_idx,
+                format_func=lambda k: dict(LANGUAGE_OPTIONS).get(k, k), key="set_lang",
             )
 
-    env_var = PROVIDER_KEY_ENV.get(provider)
-    key_ok = bool(env_var and os.getenv(env_var))
-    st.caption(
-        (f"🔑 {env_var}：{'已配置 ✅' if key_ok else '未检测到 ⚠️ 请在 .env 配置'}"
-         if env_var else "🔑 该供应商的密钥请在 .env 配置")
-    )
-
-    st.markdown("<div class='t24-set-sec'>网站设置</div>", unsafe_allow_html=True)
-    wc = st.columns(2)
-    with wc[0]:
-        new_run_time = st.text_input("每日运行时间 (HH:MM)", value=run_time, key="set_run_time")
-        cost_budget = st.number_input(
-            "每日成本预算 (USD)", min_value=0.0, value=float(s.cost_budget_usd_per_day),
-            step=1.0, key="set_budget",
-        )
-    with wc[1]:
-        price_in = st.number_input(
-            "输入单价 ($/1M tok)", min_value=0.0, value=float(s.price_per_1m_input),
-            step=0.01, format="%.2f", key="set_price_in",
-        )
-        price_out = st.number_input(
-            "输出单价 ($/1M tok)", min_value=0.0, value=float(s.price_per_1m_output),
-            step=0.01, format="%.2f", key="set_price_out",
+        analysts = st.multiselect(
+            "分析师团队", [k for k, _ in ANALYST_OPTIONS],
+            default=[a for a in s.analysts if a in ANALYST_LABEL] or [k for k, _ in ANALYST_OPTIONS],
+            format_func=lambda k: ANALYST_LABEL.get(k, k), key="set_analysts",
         )
 
-    notify = dict(s.notify or {})
-    notify_enabled = st.toggle("启用通知（Telegram）", value=bool(notify.get("enabled")), key="set_notify_en")
-    nc = st.columns(2)
-    with nc[0]:
-        notify_channel = st.text_input("通知渠道", value=notify.get("channel", "telegram"), key="set_notify_ch")
-    with nc[1]:
-        notify_target = st.text_input("通知目标", value=notify.get("target", ""), key="set_notify_tg")
+        # 密钥状态：当前供应商 + FRED（隐藏硬依赖，缺了新闻分析师会崩整次运行）
+        env_var = PROVIDER_KEY_ENV.get(provider)
+        key_ok = bool(env_var and os.getenv(env_var))
+        fred_ok = bool(os.getenv("FRED_API_KEY"))
+        prov_txt = (f"{env_var}：{'已配置 ✅' if key_ok else '未检测到 ⚠️'}"
+                    if env_var else "该供应商的密钥请在 .env 配置")
+        st.caption(f"🔑 {prov_txt} · FRED_API_KEY：{'已配置 ✅' if fred_ok else '未检测到 ⚠️'}")
+        if "news" in analysts and not fred_ok:
+            st.warning("未检测到 FRED_API_KEY：新闻分析师会调用宏观数据（FRED），"
+                       "整次分析将失败。请在 .env 配置，或暂时移除上方「新闻面」。")
+
+        with st.expander("高级：接口地址与数据源"):
+            default_url = PROVIDER_DEFAULT_URL.get(provider) or ""
+            url_seed = s.backend_url if provider == s.llm_provider else default_url
+            backend_url = st.text_input(
+                "接口地址 backend_url", value=url_seed or "",
+                key=f"set_url_{provider}", placeholder=default_url or "该供应商无需自定义地址",
+            ) or None
+            vendors = {}
+            vc = st.columns(2)
+            for i, (vk, vlabel) in enumerate(VENDOR_FIELDS):
+                cur = (s.data_vendors or {}).get(vk, "yfinance")
+                opts = ["yfinance", "alpha_vantage"]
+                vendors[vk] = vc[i % 2].selectbox(
+                    vlabel, opts, index=opts.index(cur) if cur in opts else 0,
+                    key=f"set_vendor2_{vk}",
+                )
+            st.caption("宏观数据固定走 FRED（必需 FRED_API_KEY）；"
+                       "选 alpha_vantage 需在 .env 配 ALPHA_VANTAGE_API_KEY。")
+
+    # ── Tab 2：运行与成本 ───────────────────────────────────
+    with tab_ops:
+        installed = _launchd_installed()
+        st.markdown("<div class='t24-set-sec'>每日批量分析</div>", unsafe_allow_html=True)
+        st.caption("定时任务：" + ("已安装 ✅ 将在下方时间自动运行"
+                   if installed else
+                   "本机未安装 ⚠️ 时间仅作配置——部署到常驻机器后由 "
+                   "scripts/install_launchd.sh 生效"))
+        oc = st.columns(2)
+        with oc[0]:
+            new_run_time = st.text_input("每日运行时间 (HH:MM)", value=run_time, key="set_run_time")
+        with oc[1]:
+            cost_budget = st.number_input(
+                "每日成本预算 (USD)", min_value=0.0, value=float(s.cost_budget_usd_per_day),
+                step=1.0, key="set_budget",
+            )
+        today_cost = sum((r.cost_usd or 0) for r in db.get_runs(conn, limit=50)
+                         if r.status == "success" and run_is_today(r))
+        st.caption(f"今日成本 ${today_cost:.2f} / 预算 ${s.cost_budget_usd_per_day:.0f}"
+                   f"（约 ${0.1:.2f}/只/次，超预算仅提醒不拦截）")
+
+        st.markdown("<div class='t24-set-sec'>行情数据</div>", unsafe_allow_html=True)
+        st.caption("每天首次打开页面时自动全量刷新一次；盘中需要最新价时手动刷新（免费，不调用 LLM）。")
+        if st.button("立即刷新行情", key="set_refresh_now", width="stretch"):
+            with st.spinner("正在拉取最新行情…"):
+                _c = db.connect(check_same_thread=False)
+                for _sym in symbols:
+                    try:
+                        prices.snapshot(_c, _sym)
+                    except Exception:  # noqa: BLE001
+                        pass
+                _state = _price_refresh_state()
+                _state["date"] = date.today().isoformat()
+                _state["key"] = tuple(symbols)
+                _save_refresh_mark(_state)
+            st.toast(f"已刷新 {len(symbols)} 只标的的行情")
+
+        with st.expander("成本核算单价（高级）"):
+            pc = st.columns(2)
+            price_in = pc[0].number_input(
+                "输入单价 ($/1M tok)", min_value=0.0, value=float(s.price_per_1m_input),
+                step=0.01, format="%.2f", key="set_price_in",
+            )
+            price_out = pc[1].number_input(
+                "输出单价 ($/1M tok)", min_value=0.0, value=float(s.price_per_1m_output),
+                step=0.01, format="%.2f", key="set_price_out",
+            )
+            st.caption("仅影响成本估算的换算，按 LLM 供应商实际账单调整。")
 
     st.divider()
+    st.caption("通知（Telegram 每日摘要/价格预警）规划中，尚未上线。")
     bc = st.columns([1, 1])
     if bc[0].button("保存", type="primary", width="stretch", key="set_save"):
+        clean_time = new_run_time.strip()
+        if clean_time and not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", clean_time):
+            st.error("运行时间格式请使用 HH:MM，例如 08:30。")
+            return
         new = Settings(
             llm_provider=provider,
             deep_think_llm=deep.strip() or s.deep_think_llm,
@@ -3318,16 +3394,16 @@ def render_settings_dialog() -> None:
             max_debate_rounds=depth,
             max_risk_discuss_rounds=depth,
             output_language=output_language,
-            data_vendors={k: v.strip() for k, v in vendors.items() if v.strip()},
+            data_vendors={k: v for k, v in vendors.items() if v},
             cost_budget_usd_per_day=cost_budget,
             price_per_1m_input=price_in,
             price_per_1m_output=price_out,
-            notify={"enabled": notify_enabled, "channel": notify_channel, "target": notify_target},
+            notify=dict(s.notify or {}),   # 通知未上线：原样保留 yaml 配置
             analysts=analysts or ["market", "social", "news", "fundamentals"],
         )
         save_settings(new)
-        if new_run_time.strip() and new_run_time.strip() != run_time:
-            save_watchlist(new_run_time.strip(), watch)
+        if clean_time and clean_time != run_time:
+            save_watchlist(clean_time, watch)
         st.toast("设置已保存，下次分析生效")
         st.rerun()
     if bc[1].button("取消", width="stretch", key="set_cancel"):
@@ -4211,18 +4287,11 @@ def manage():
         unsafe_allow_html=True,
     )
 
-    with st.form("run_time_form", border=False):
-        ct = st.columns([2, 1], vertical_alignment="bottom")
-        new_time = ct[0].text_input("每日运行时间 (HH:MM)", rt)
-        saved_time = ct[1].form_submit_button("保存时间", width="stretch")
-    if saved_time:
-        clean_time = new_time.strip() or rt
-        if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", clean_time):
-            st.error("时间格式请使用 HH:MM，例如 08:30。")
-        else:
-            save_watchlist(clean_time, tickers)
-            st.toast("已保存运行时间")
-            st.rerun()
+    st.markdown(
+        f"<div class='t24-muted'>每日运行时间 <b>{html_safe(rt)}</b>"
+        " · 在右上角「设置 → 运行与成本」修改。</div>",
+        unsafe_allow_html=True,
+    )
 
     if tickers:
         states = [today_run_state(t.symbol) for t in tickers]
@@ -4436,7 +4505,8 @@ def _queue_ai(prompt: str, thread) -> None:
                 mention_labels.append(f"@ {names.get(s, s)}")
     if not _set_ai_pending(prompt, thread):
         return
-    thread["messages"].append({"role": "user", "content": prompt, "attachments": mention_labels})
+    thread["messages"].append({"role": "user", "content": prompt, "attachments": mention_labels,
+                               "ts": datetime.now(timezone.utc).isoformat()})
     if thread["title"] == "新对话":
         thread["title"] = prompt[:14] + ("…" if len(prompt) > 14 else "")
     _save_ai_thread(thread)
@@ -4448,6 +4518,7 @@ def _set_ai_pending(prompt: str, thread) -> bool:
     if not run_ids:
         thread["messages"].append({
             "role": "assistant", "ok": False, "attachments": [],
+            "ts": datetime.now(timezone.utc).isoformat(),
             "content": "还没有可用的分析记录。先在关注列表跑一次分析，我就能基于结果回答了。"})
         _save_ai_thread(thread)
         return False
@@ -4481,6 +4552,18 @@ def _note_page_switch(thread) -> None:
         _save_ai_thread(thread)
 
 
+def _msg_time_label(ts: str | None) -> str:
+    """消息时间：当天只显 HH:MM，跨天带月日。"""
+    if not ts:
+        return ""
+    try:
+        t = datetime.fromisoformat(ts).astimezone()
+    except ValueError:
+        return ""
+    fmt = "%H:%M" if t.date() == datetime.now().astimezone().date() else "%m-%d %H:%M"
+    return t.strftime(fmt)
+
+
 def _render_ai_message(msg) -> None:
     if msg["role"] == "system":
         st.markdown(f"<div class='t24-ai-sysnote'>{html_safe(msg['content'])}</div>",
@@ -4495,10 +4578,14 @@ def _render_ai_message(msg) -> None:
         for lb in (msg.get("attachments") or [])[:4]
     )
     chips_html = f"<div class='t24-ai-chips'>{chips}</div>" if chips else ""
+    tlabel = _msg_time_label(msg.get("ts"))
+    meta_left = role_label + (f" · {tlabel}" if tlabel else "")
+    copy_btn = ("<button class='t24-ai-copy' type='button'>复制</button>"
+                if msg["role"] == "assistant" else "")
     st.markdown(
         f"<div class='t24-ai-msg {css_role}'>"
-        f"<div class='t24-ai-meta'>{role_label}</div>"
-        f"<div>{body}</div>{chips_html}</div>",
+        f"<div class='t24-ai-meta'><span>{html_safe(meta_left)}</span>{copy_btn}</div>"
+        f"<div class='t24-ai-body'>{body}</div>{chips_html}</div>",
         unsafe_allow_html=True,
     )
 
@@ -4562,6 +4649,22 @@ def _render_ai_scope_section(thread) -> None:
                     thread["excluded_syms"].append(s)
                 _save_ai_thread(thread)
                 st.rerun()
+        # @ 引用的具体历史决策（run 级，跨页面持续生效）——必须可见、可移除
+        pinned_runs = [(rid, run_by_id(rid)) for rid in (thread.get("pinned_run_ids") or [])]
+        pinned_runs = [(rid, r) for rid, r in pinned_runs if r]
+        if pinned_runs:
+            st.caption("@ 引用的历史决策（跨页面持续生效）：")
+            for rid, r in pinned_runs:
+                cols = st.columns([6, 0.9], vertical_alignment="center")
+                cols[0].markdown(
+                    f"<div class='t24-ai-ctx-row'><b>{html_safe(names.get(r.ticker, r.ticker))}</b>"
+                    f" · {html_safe(r.ticker)} · {html_safe(r.trade_date)}"
+                    f" · {html_safe(decision_label(r.decision))} · {html_safe(run_display_no(r))}</div>",
+                    unsafe_allow_html=True)
+                if cols[1].button("✕", key=f"ai_ctx_rm_run_{thread['id']}_{rid}"):
+                    thread["pinned_run_ids"] = [x for x in thread["pinned_run_ids"] if x != rid]
+                    _save_ai_thread(thread)
+                    st.rerun()
         removed = [s for s in thread["excluded_syms"] if s in base]
         if removed:
             st.caption("已移除：" + "、".join(names.get(s, s) for s in removed))
@@ -4604,6 +4707,7 @@ def _stream_pending_answer(thread, pending) -> None:
     thread["messages"].append({
         "role": "assistant", "content": str(full or "").strip(), "ok": status["ok"],
         "attachments": pending.get("labels", [])[:3],
+        "ts": datetime.now(timezone.utc).isoformat(),
     })
     st.session_state.ai_pending = None
     _save_ai_thread(thread)
@@ -4652,6 +4756,29 @@ def render_ai_plugin():
             }, true);
           })();`;
           doc.body.appendChild(s);
+          if (!doc.getElementById("t24-ai-copy-script")) {
+            const c = doc.createElement("script");
+            c.id = "t24-ai-copy-script";
+            c.textContent = `(() => {
+              if (window.__t24AiCopy) return;
+              window.__t24AiCopy = true;
+              document.addEventListener("click", (e) => {
+                const btn = e.target.closest(".t24-ai-copy");
+                if (!btn) return;
+                e.preventDefault(); e.stopPropagation();
+                const body = btn.closest(".t24-ai-msg")?.querySelector(".t24-ai-body");
+                if (!body) return;
+                navigator.clipboard.writeText(body.innerText).then(() => {
+                  btn.textContent = "已复制";
+                  setTimeout(() => { btn.textContent = "复制"; }, 1200);
+                }).catch(() => {
+                  btn.textContent = "复制失败";
+                  setTimeout(() => { btn.textContent = "复制"; }, 1200);
+                });
+              }, true);
+            })();`;
+            doc.body.appendChild(c);
+          }
         })();
         </script>""",
         height=0,
