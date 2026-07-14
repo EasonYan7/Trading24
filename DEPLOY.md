@@ -46,18 +46,15 @@ cd Trading24
 ```
 
 **tradingagents 本地依赖**（`pyproject.toml` 里写死了它的路径）。
-⚠️ 本机的 TradingAgents **带有我们自己的提交**（`df045a3`：最终决策输出建仓区/止损/仓位字段），
-GitHub 上游没有这个改动，**不能直接 clone 上游**。两种迁移方式任选：
+⚠️ 这不是上游原版——带有我们自己的提交（`df045a3`：最终决策输出建仓区/止损/仓位字段），
+已备份到私有 fork **[EasonYan7/TradingAgents](https://github.com/EasonYan7/TradingAgents)**，
+mini 上直接 clone 这个 fork（不要 clone TauricResearch 上游，会丢失该改动）：
 
 ```bash
-# 方式 A（推荐）：直接从本机拷贝整个目录（含本地提交）
-rsync -a --exclude .venv 旧机器:/Users/didi/TradingAgents/ /Users/didi/TradingAgents/
-
-# 方式 B：把本机 TradingAgents 推到你自己的 GitHub fork，mini 上 clone 你的 fork
-# （在本机）git remote add mine git@github.com:<你>/TradingAgents.git && git push mine main
+git clone https://github.com/EasonYan7/TradingAgents.git /Users/didi/TradingAgents
 ```
 
-若 mini 上的用户名不是 didi，改 `pyproject.toml` 的 `[tool.uv.sources]` path 或放到同名路径。
+若 mini 上的用户名不是 didi，改 `pyproject.toml` 的 `[tool.uv.sources]` path 或克隆到同名路径。
 
 > `data/trading24.sqlite` 已随主仓库带过来，作**初始种子库**，clone 后直接有历史结果。上线后以 mini 上这份为准（见第 7 节）。
 
@@ -165,9 +162,12 @@ sudo pmset -c sleep 0 disksleep 0 displaysleep 10
 tail -f data/dashboard.log      # 看板日志
 tail -f data/batch.log          # 每日批量日志
 
-# 改完代码后更新
+# 改完代码后更新（Trading24 主仓库）
 git pull && uv sync
 launchctl kickstart -k gui/$UID/ai.trading24.dashboard   # 重启看板
+
+# TradingAgents fork 有更新时（改了执行参数字段等）
+(cd /Users/didi/TradingAgents && git pull) && uv sync
 
 # 停 / 起某个任务
 launchctl unload ~/Library/LaunchAgents/ai.trading24.dashboard.plist
@@ -196,5 +196,8 @@ launchctl load   ~/Library/LaunchAgents/ai.trading24.dashboard.plist
 - `Dockerfile` / `docker-compose.yml` —— 看板 + scheduler(supercronic 定时) + cloudflared 一把起
 - `deploy/crontab` —— Docker 版的每日触发
 - `deploy/litestream.yml` —— SQLite → R2 备份
+
+`Dockerfile` 里 `TRADINGAGENTS_REPO`/`TRADINGAGENTS_REF` 已默认指向
+`EasonYan7/TradingAgents` fork 的 `df045a3`，不用改就能直接构建。
 
 届时在 Linux 上：`cp .env.example .env` 填好 → `docker compose up -d --build`。Cloudflare Tunnel 的 Public Hostname URL 那里改成 `http://dashboard:8501`（容器服务名）即可。

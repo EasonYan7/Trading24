@@ -5,7 +5,11 @@ name: trading24
 
 services:
   dashboard:
-    build: .
+    build:
+      context: .
+      args:
+        # TradingAgents fork 是私有仓库：构建需要有读权限的 GitHub token（.env 里的 GH_TOKEN）。
+        GH_TOKEN: ${GH_TOKEN:-}
     image: trading24:latest
     restart: unless-stopped
     env_file: [.env]

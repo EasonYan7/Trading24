@@ -17,13 +17,19 @@ RUN ARCH="$(dpkg --print-architecture)" \
 
 # 关键：把 tradingagents 克隆到与本地开发完全相同的绝对路径。
 # 这样 pyproject.toml 与 uv.lock 里的 path 依赖无需任何改动，uv sync --frozen 完全可复现。
-# ⚠️ 本地 TradingAgents 含自有提交 df045a3（PM 输出建仓区/止损/仓位字段），上游没有。
-#    构建镜像前必须把 REPO 换成你自己的 fork（并推上去），REF 换成 fork 上的 commit；
-#    直接用上游 TauricResearch 会丢失该改动。
-ARG TRADINGAGENTS_REPO=https://github.com/TauricResearch/TradingAgents.git
-ARG TRADINGAGENTS_REF=c15200dc286b66abce3f1bcf09b298dc06b8539d
-RUN git clone "${TRADINGAGENTS_REPO}" /Users/didi/TradingAgents \
-    && git -C /Users/didi/TradingAgents checkout --quiet "${TRADINGAGENTS_REF}"
+# 默认指向我们的私有 fork（含 df045a3：PM 输出建仓区/止损/仓位字段，上游没有这个改动）。
+# ⚠️ fork 是私有仓库：构建时用 --build-arg GH_TOKEN=<有 repo 读权限的 token> 传入
+#    （或用一个具备访问权限的 SSH agent 挂载改成 SSH clone）；否则 clone 会因鉴权失败报错。
+ARG TRADINGAGENTS_REPO=https://github.com/EasonYan7/TradingAgents.git
+ARG TRADINGAGENTS_REF=df045a356ade1b6aa84afa641e2e3ebd93c0e600
+ARG GH_TOKEN=""
+RUN CLONE_URL="${TRADINGAGENTS_REPO}"; \
+    if [ -n "${GH_TOKEN}" ]; then \
+        CLONE_URL=$(echo "${TRADINGAGENTS_REPO}" | sed "s#https://#https://${GH_TOKEN}@#"); \
+    fi; \
+    git clone "${CLONE_URL}" /Users/didi/TradingAgents \
+    && git -C /Users/didi/TradingAgents checkout --quiet "${TRADINGAGENTS_REF}" \
+    && git -C /Users/didi/TradingAgents remote set-url origin "${TRADINGAGENTS_REPO}"
 
 WORKDIR /app
 
