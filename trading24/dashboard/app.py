@@ -2483,8 +2483,44 @@ def _auto_refresh_prices(symbols: tuple[str, ...]) -> None:
         overlay.empty()
 
 
+_ORPHANS_RECONCILED = False
+_STALE_RUN_MINUTES = 25  # 单只分析正常几分钟；超过判为卡死
+
+
+def _reconcile_stuck_runs(conn) -> None:
+    """回收僵尸/卡死的 running 运行，避免 UI 永远卡在「运行中/取消运行」、报告不出。
+    ① 进程刚启动：DB 里任何 running 都是上个进程留下的死线程（本进程还没起任何分析线程）。
+       这类纯中断没有价值，直接删除，不在历史里留「失败」噪音。
+    ② 同进程内某次 running 超过 _STALE_RUN_MINUTES 分钟 → 判为卡死（LLM/网络卡住），
+       标记 failed 以便重跑（可能是真问题，保留可见）。"""
+    global _ORPHANS_RECONCILED
+    now = datetime.now(timezone.utc)
+    orphans, stale = [], []
+    for r in conn.execute("SELECT id, started_at FROM runs WHERE status='running'").fetchall():
+        if not _ORPHANS_RECONCILED:
+            orphans.append(r["id"])
+            continue
+        try:
+            age_min = (now - datetime.fromisoformat(r["started_at"])).total_seconds() / 60
+            if age_min > _STALE_RUN_MINUTES:
+                stale.append(r["id"])
+        except (TypeError, ValueError):
+            stale.append(r["id"])
+    _ORPHANS_RECONCILED = True
+    if orphans:
+        db.delete_runs(conn, orphans)  # 删运行+报告
+    if stale:
+        ph = ",".join("?" for _ in stale)
+        conn.execute(
+            f"UPDATE runs SET status='failed', finished_at=?, "
+            f"error='分析卡死（超时无进展），可重跑' WHERE id IN ({ph})",
+            [db.now_iso(), *stale])
+        conn.commit()
+
+
 conn = get_conn()
 st.markdown(THEME_CSS + CSS, unsafe_allow_html=True)
+_reconcile_stuck_runs(conn)  # 回收僵尸/卡死的 running 记录，避免 UI 卡在「运行中」
 run_time, watch = load_watchlist()
 symbols = [t.symbol for t in watch]
 names = {t.symbol: t.name for t in watch}
@@ -3134,12 +3170,34 @@ def _pipeline_progress_html(run_id: int | None) -> str:
     )
 
 
-def _render_live_status_card(sym: str, run: Run | None) -> str | None:
-    """渲染运行状态卡，返回当前 status（pending/running/success/failed/None）。"""
-    pending = sym in st.session_state.pending_analysis_symbols
-    status = run.status if run else ("pending" if pending else None)
+def _pending_run_view(sym: str):
+    """本会话为 sym 发起的这次分析的 (status, run)。
+    - 不在 pending（本会话没发起）→ (None, None)，不显示状态卡。
+    - 已发起但后台还没建好 run 记录（latest 仍是更早的旧运行）→ ('pending', None)，显示"创建任务中"，
+      避免把上一次的成功/失败误当成本次结果（这正是"点分析立刻显示完成"的根因）。
+    - 已建好并在跑/完成 → (run.status, run)。
+    - 发起后等太久仍没建好记录（后台线程起不来）→ ('failed', None)，避免一直卡"创建中"。"""
+    pending_ts = st.session_state.pending_analysis_symbols.get(sym)
+    if pending_ts is None:
+        return None, None
+    run = (db.get_runs(conn, ticker=sym, limit=1) or [None])[0]
+    if run and run.started_at:
+        try:
+            if datetime.fromisoformat(run.started_at) >= datetime.fromisoformat(pending_ts):
+                return run.status, run  # 就是这次发起的运行
+        except (TypeError, ValueError):
+            pass
+    try:
+        waited = (datetime.now(timezone.utc) - datetime.fromisoformat(pending_ts)).total_seconds()
+    except (TypeError, ValueError):
+        waited = 0
+    return ("failed", None) if waited > 90 else ("pending", None)
+
+
+def _render_live_status_card(sym: str, status: str, run: Run | None = None) -> None:
+    """按给定 status 渲染运行状态卡。status: pending/running/success/failed。"""
     if status not in {"pending", "running", "success", "failed"}:
-        return status
+        return
     if status == "pending":
         title = f"{sym} 正在创建分析任务"
         sub = "已完成价格数据校验，正在启动单只股票分析。"
@@ -3174,28 +3232,29 @@ def _render_live_status_card(sym: str, run: Run | None) -> str | None:
         f"</div>",
         unsafe_allow_html=True,
     )
-    return status
 
 
 @st.fragment(run_every=3)
 def _live_analysis_fragment(sym: str) -> None:
     """运行中每 3 秒只局部重跑这块（不整页刷新、不闪）；完成后整页 rerun 出完整报告。"""
-    run = (db.get_runs(conn, ticker=sym, limit=1) or [None])[0]
-    status = _render_live_status_card(sym, run)
+    status, run = _pending_run_view(sym)
+    if status is None:
+        return
+    _render_live_status_card(sym, status, run)
     if status in {"success", "failed"}:
         st.session_state.pending_analysis_symbols.pop(sym, None)
         st.rerun()  # 跳出轮询，触发整页 rerun 渲染决策历史和报告
 
 
 def render_live_analysis_status(sym: str, run: Run | None) -> None:
-    pending = sym in st.session_state.pending_analysis_symbols
-    status = run.status if run else ("pending" if pending else None)
+    status, cur = _pending_run_view(sym)
+    if status is None:
+        return
     if status in {"pending", "running"}:
         _live_analysis_fragment(sym)
-    elif status in {"success", "failed"} and pending:
-        # 只在本会话刚看着它跑完的这一次显示收尾卡；平时访问不出现
+    else:  # success/failed：本会话刚看着它跑完，显示收尾卡后清 pending
         st.session_state.pending_analysis_symbols.pop(sym, None)
-        _render_live_status_card(sym, run)
+        _render_live_status_card(sym, status, cur)
 
 
 LLM_PROVIDERS = [
@@ -3954,7 +4013,15 @@ def detail_view(sym):
             _, act_r = st.columns([1, 0.26], vertical_alignment="center")
             with act_r:
                 if run_state in ("running", "queued"):
-                    st.button("分析中…", key=f"run_{sym}", width="stretch", disabled=True)
+                    # 运行中/排队中：可点「取消运行」——协作式停下后台任务并删除本次记录
+                    if st.button("取消运行", key=f"run_{sym}", width="stretch"):
+                        _rr = (db.get_runs(conn, ticker=sym, limit=1) or [None])[0]
+                        if _rr is not None and _rr.status == "running" and _rr.id is not None:
+                            runner.request_cancel(int(_rr.id))
+                            db.delete_runs(conn, [int(_rr.id)])  # 立即从界面移除，后台任务在下个节点停下
+                        st.session_state.pending_analysis_symbols.pop(sym, None)
+                        st.toast(f"已取消 {sym} 的分析，并删除本次运行")
+                        st.rerun()
                 # 当天已跑过（成功/失败）→「重新分析」；当天没跑过 →「分析」
                 elif st.button("重新分析" if run_state in ("done", "failed") else "分析",
                                key=f"run_{sym}", width="stretch", type="primary"):

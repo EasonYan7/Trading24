@@ -5,9 +5,39 @@ Phase 3 做实时进度时再改造为 graph.stream() 逐节点写入。
 """
 from __future__ import annotations
 
+import threading
+
 from .config import Settings, load_settings, market_of
 from .db import database as db
 from . import prices
+
+
+# ── 协作式取消 ──────────────────────────────────────────────
+# app 侧点「取消运行」时登记 run_id；_run_streamed 在每个节点边界检查后停止，
+# 这样能真正停下、不再烧 token（而不是杀线程）。run_one 捕获后删除本次记录。
+_cancel_lock = threading.Lock()
+_cancel_run_ids: set[int] = set()
+
+
+class AnalysisCancelled(Exception):
+    """用户在运行中取消。run_one 捕获后删除本次运行、不标记为失败。"""
+
+
+def request_cancel(run_id: int) -> None:
+    with _cancel_lock:
+        _cancel_run_ids.add(int(run_id))
+
+
+def clear_cancel(run_id: int) -> None:
+    with _cancel_lock:
+        _cancel_run_ids.discard(int(run_id))
+
+
+def is_cancelled(run_id: int | None) -> bool:
+    if run_id is None:
+        return False
+    with _cancel_lock:
+        return int(run_id) in _cancel_run_ids
 
 
 def _section_map(final_state: dict) -> dict[str, str]:
@@ -69,6 +99,8 @@ def _run_streamed(ta, ticker: str, trade_date: str, conn, run_id: int):
     final_state: dict = {}
     written: dict[str, str] = {}
     for chunk in ta.graph.stream(init_state, **args):
+        if is_cancelled(run_id):  # 用户取消：在节点边界停下，不再继续跑
+            raise AnalysisCancelled()
         final_state.update(chunk)
         for section, content in _section_map(final_state).items():
             text = str(content)
@@ -142,6 +174,13 @@ def run_one(ticker: str, trade_date: str, settings: Settings | None = None,
                 db.upsert_decision_params(conn, run_id, params, model=settings.quick_think_llm)
         except Exception:  # noqa: BLE001  提取失败不影响主流程
             pass
+        return run_id
+    except AnalysisCancelled:
+        # 用户取消：删除本次运行及其报告，不标记为失败（幂等，app 侧可能已删）
+        try:
+            db.delete_runs(conn, [run_id])
+        finally:
+            clear_cancel(run_id)
         return run_id
     except Exception as e:  # noqa: BLE001
         db.fail_run(conn, run_id, e)
