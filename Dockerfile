@@ -17,11 +17,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 
 # 关键：把 tradingagents 克隆到与本地开发完全相同的绝对路径。
 # 这样 pyproject.toml 与 uv.lock 里的 path 依赖无需任何改动，uv sync --frozen 完全可复现。
-# 默认指向我们的私有 fork（含 df045a3：PM 输出建仓区/止损/仓位字段，上游没有这个改动）。
+# 默认指向我们的私有 fork（含 d97751d：4 个分析师并行；以及此前 PM 输出建仓区/止损/仓位字段）。
+# 该 commit 目前在 fork 的 feat/parallel-analysts 分支上，clone 时会拉到、可直接 checkout；
+# 若把 fork PR 合进 main，可把此 ref 改成 main 的新 commit（更长期稳妥，避免分支删除后被 GC）。
 # ⚠️ fork 是私有仓库：构建时用 --build-arg GH_TOKEN=<有 repo 读权限的 token> 传入
 #    （或用一个具备访问权限的 SSH agent 挂载改成 SSH clone）；否则 clone 会因鉴权失败报错。
 ARG TRADINGAGENTS_REPO=https://github.com/EasonYan7/TradingAgents.git
-ARG TRADINGAGENTS_REF=df045a356ade1b6aa84afa641e2e3ebd93c0e600
+ARG TRADINGAGENTS_REF=d97751da6b5d9c300f5072d8154c2e798e554f0c
 ARG GH_TOKEN=""
 RUN CLONE_URL="${TRADINGAGENTS_REPO}"; \
     if [ -n "${GH_TOKEN}" ]; then \
