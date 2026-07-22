@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,10 +59,23 @@ def finish_run(conn, run_id, decision, tokens, cost_usd) -> None:
     conn.commit()
 
 
+_SECRET_RE = re.compile(
+    r'((?:api[_-]?key|apikey|access[_-]?key|secret|token|password|pwd)=)'
+    r'([^&\s"\'#]+)', re.IGNORECASE)
+_BEARER_RE = re.compile(r'(Bearer\s+)([A-Za-z0-9._\-]{8,})', re.IGNORECASE)
+
+
+def redact_secrets(text: str) -> str:
+    """把 URL/文本里的 api_key/token/密码等值打码，避免明文密钥落库（DB 会进 git）。"""
+    text = _SECRET_RE.sub(r'\1***', text)
+    text = _BEARER_RE.sub(r'\1***', text)
+    return text
+
+
 def fail_run(conn, run_id, error) -> None:
     conn.execute(
         "UPDATE runs SET status='failed', finished_at=?, error=? WHERE id=?",
-        (now_iso(), str(error)[:1000], run_id),
+        (now_iso(), redact_secrets(str(error))[:1000], run_id),
     )
     conn.commit()
 

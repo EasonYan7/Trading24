@@ -2205,43 +2205,48 @@ def report_cards_html(run: Run, include_anchors: bool = False) -> str:
     return html
 
 
+# 图标统一取自 Lucide (https://lucide.dev/icons/)。每个值是图标的内部图元，
+# 由 icon() 套上标准 <svg> 外壳（24 网格、圆角线帽）。新增图标请从 Lucide 复制路径。
 ICON_PATHS = {
-    "overview": (
-        "<rect x='4' y='4' width='6' height='6' rx='1'/>"
-        "<rect x='14' y='4' width='6' height='6' rx='1'/>"
-        "<rect x='4' y='14' width='6' height='6' rx='1'/>"
-        "<rect x='14' y='14' width='6' height='6' rx='1'/>"
-    ),
-    "analysis": "<path d='M4 19V5'/><path d='M4 19h16'/><path d='M7 15l3-4 3 2 5-7'/>",
-    "history": "<path d='M4 12a8 8 0 1 0 2.2-5.5'/><path d='M4 5v5h5'/><path d='M12 8v5l3 2'/>",
-    "manage": "<path d='M5 7h8'/><path d='M17 7h2'/><path d='M5 17h2'/><path d='M11 17h8'/><rect x='13' y='5' width='4' height='4' rx='1'/><rect x='7' y='15' width='4' height='4' rx='1'/>",
-    "watch": "<path d='M5 6h14'/><path d='M5 12h14'/><path d='M5 18h14'/>",
-    "ai": "<rect x='4' y='5' width='16' height='14' rx='3'/><path d='M8 10h8'/><path d='M8 14h5'/><path d='M9 2v3'/><path d='M15 2v3'/>",
-    "trend": "<path d='M4 17h16'/><path d='M5 15l4-4 4 2 6-7'/><path d='M16 6h3v3'/>",
-    "terminal": "<path d='M5 7l4 5-4 5'/><path d='M12 17h7'/>",
-    "cpu": "<rect x='7' y='7' width='10' height='10' rx='1'/><path d='M9 2v3'/><path d='M15 2v3'/><path d='M9 19v3'/><path d='M15 19v3'/><path d='M2 9h3'/><path d='M2 15h3'/><path d='M19 9h3'/><path d='M19 15h3'/>",
-    "bell": "<path d='M6 17h12'/><path d='M8 17V10a4 4 0 0 1 8 0v7'/><path d='M10 20h4'/>",
-    "search": "<circle cx='10' cy='10' r='5'/><path d='M14 14l5 5'/>",
-    "moon": "<path d='M20 14.5A7 7 0 0 1 9.5 4 8 8 0 1 0 20 14.5z'/>",
-    "sun": "<circle cx='12' cy='12' r='4'/><path d='M12 2v2'/><path d='M12 20v2'/><path d='M4.9 4.9l1.4 1.4'/><path d='M17.7 17.7l1.4 1.4'/><path d='M2 12h2'/><path d='M20 12h2'/><path d='M4.9 19.1l1.4-1.4'/><path d='M17.7 6.3l1.4-1.4'/>",
-    "user": "<circle cx='12' cy='8' r='4'/><path d='M4 21a8 8 0 0 1 16 0'/>",
-    "file": "<path d='M6 3h8l4 4v14H6z'/><path d='M14 3v5h5'/><path d='M9 13h6'/><path d='M9 17h6'/>",
-    "shield": "<path d='M12 3l7 3v5c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z'/>",
-    "news": "<path d='M5 5h14v14H5z'/><path d='M8 9h8'/><path d='M8 13h8'/><path d='M8 17h5'/>",
-    "trash": "<path d='M5 7h14'/><path d='M9 7V4h6v3'/><path d='M8 10v9'/><path d='M16 10v9'/><path d='M6 7l1 14h10l1-14'/>",
-    "edit": "<path d='M4 20h4l11-11-4-4L4 16z'/><path d='M13 7l4 4'/>",
-    "send": "<path d='M3 11l18-8-8 18-2-7z'/><path d='M11 14l4-4'/>",
-    "chevron": "<path d='M9 5l7 7-7 7'/>",
-    "spark": "<path d='M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z'/>",
+    "overview": "<rect width='7' height='7' x='3' y='3' rx='1'/><rect width='7' height='7' x='14' y='3' rx='1'/><rect width='7' height='7' x='14' y='14' rx='1'/><rect width='7' height='7' x='3' y='14' rx='1'/>",  # layout-grid
+    "analysis": "<path d='M3 3v16a2 2 0 0 0 2 2h16'/><path d='m19 9-5 5-4-4-3 3'/>",  # chart-line
+    "history": "<path d='M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8'/><path d='M3 3v5h5'/><path d='M12 7v5l4 2'/>",  # history
+    "manage": "<line x1='21' x2='14' y1='4' y2='4'/><line x1='10' x2='3' y1='4' y2='4'/><line x1='21' x2='12' y1='12' y2='12'/><line x1='8' x2='3' y1='12' y2='12'/><line x1='21' x2='16' y1='20' y2='20'/><line x1='12' x2='3' y1='20' y2='20'/><line x1='14' x2='14' y1='2' y2='6'/><line x1='8' x2='8' y1='10' y2='14'/><line x1='16' x2='16' y1='18' y2='22'/>",  # sliders-horizontal
+    "watch": "<line x1='8' x2='21' y1='6' y2='6'/><line x1='8' x2='21' y1='12' y2='12'/><line x1='8' x2='21' y1='18' y2='18'/><line x1='3' x2='3.01' y1='6' y2='6'/><line x1='3' x2='3.01' y1='12' y2='12'/><line x1='3' x2='3.01' y1='18' y2='18'/>",  # list
+    "ai": "<path d='M12 8V4H8'/><rect width='16' height='12' x='4' y='8' rx='2'/><path d='M2 14h2'/><path d='M20 14h2'/><path d='M15 13v2'/><path d='M9 13v2'/>",  # bot
+    "trend": "<polyline points='22 7 13.5 15.5 8.5 10.5 2 17'/><polyline points='16 7 22 7 22 13'/>",  # trending-up
+    "terminal": "<polyline points='4 17 10 11 4 5'/><line x1='12' x2='20' y1='19' y2='19'/>",  # terminal
+    "cpu": "<rect width='16' height='16' x='4' y='4' rx='2'/><rect width='6' height='6' x='9' y='9' rx='1'/><path d='M15 2v2'/><path d='M15 20v2'/><path d='M2 15h2'/><path d='M2 9h2'/><path d='M20 15h2'/><path d='M20 9h2'/><path d='M9 2v2'/><path d='M9 20v2'/>",  # cpu
+    "bell": "<path d='M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'/><path d='M10.3 21a1.94 1.94 0 0 0 3.4 0'/>",  # bell
+    "search": "<circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/>",  # search
+    "moon": "<path d='M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z'/>",  # moon
+    "sun": "<circle cx='12' cy='12' r='4'/><path d='M12 2v2'/><path d='M12 20v2'/><path d='m4.93 4.93 1.41 1.41'/><path d='m17.66 17.66 1.41 1.41'/><path d='M2 12h2'/><path d='M20 12h2'/><path d='m6.34 17.66-1.41 1.41'/><path d='m19.07 4.93-1.41 1.41'/>",  # sun
+    "user": "<path d='M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2'/><circle cx='12' cy='7' r='4'/>",  # user
+    "file": "<path d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z'/><path d='M14 2v4a2 2 0 0 0 2 2h4'/><path d='M16 13H8'/><path d='M16 17H8'/><path d='M10 9H8'/>",  # file-text
+    "shield": "<path d='M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z'/>",  # shield
+    "news": "<path d='M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2'/><path d='M18 14h-8'/><path d='M15 18h-5'/><path d='M10 6h8v4h-8V6Z'/>",  # newspaper
+    "trash": "<path d='M3 6h18'/><path d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6'/><path d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2'/><line x1='10' x2='10' y1='11' y2='17'/><line x1='14' x2='14' y1='11' y2='17'/>",  # trash-2
+    "edit": "<path d='M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z'/><path d='m15 5 4 4'/>",  # pencil
+    "send": "<path d='M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z'/><path d='m21.854 2.147-10.94 10.939'/>",  # send
+    "chevron": "<path d='m9 18 6-6-6-6'/>",  # chevron-right
+    "spark": "<path d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z'/><path d='M20 3v4'/><path d='M22 5h-4'/><path d='M4 17v2'/><path d='M5 18H3'/>",  # sparkles
+    # 合并页新增
+    "eye": "<path d='M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0'/><circle cx='12' cy='12' r='3'/>",  # eye
+    "eye_off": "<path d='M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49'/><path d='M14.084 14.158a3 3 0 0 1-4.242-4.242'/><path d='M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143'/><path d='m2 2 20 20'/>",  # eye-off
+    "wallet": "<path d='M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1'/><path d='M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4'/>",  # wallet
+    "refresh": "<path d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/><path d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16'/><path d='M3 21v-5h5'/>",  # refresh-cw
+    "plus": "<path d='M5 12h14'/><path d='M12 5v14'/>",  # plus
+    "settings": "<path d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z'/><circle cx='12' cy='12' r='3'/>",  # settings
 }
 
 
 def icon(name: str, size: int = 18) -> str:
+    """Lucide 图标 → 内联 SVG。未知名字回退到 spark，永不抛错。"""
     path = ICON_PATHS.get(name, ICON_PATHS["spark"])
     return (
         f"<svg class='t24-icon' width='{size}' height='{size}' viewBox='0 0 24 24' "
-        "fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='square' "
-        f"stroke-linejoin='miter' aria-hidden='true'>{path}</svg>"
+        "fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' "
+        f"stroke-linejoin='round' aria-hidden='true'>{path}</svg>"
     )
 
 
@@ -2483,8 +2488,16 @@ st.markdown(THEME_CSS + CSS, unsafe_allow_html=True)
 run_time, watch = load_watchlist()
 symbols = [t.symbol for t in watch]
 names = {t.symbol: t.name for t in watch}
-if symbols:
-    _auto_refresh_prices(tuple(symbols))  # 每个自然日首次进入时刷新一次
+# 持仓自身代码（含美股 ADR，如 XIACY/BABA，通常不在关注列表）也一并抓价，
+# 供持仓面板按实时价重算市值/浮盈亏。symbols 本身仍=关注列表，不掺入持仓代码。
+try:
+    from trading24 import holdings as _hold_mod
+    _holding_syms = [p.symbol for p in _hold_mod.load_positions() if p.symbol]
+except Exception:  # noqa: BLE001
+    _holding_syms = []
+_refresh_syms = tuple(dict.fromkeys([*symbols, *_holding_syms]))  # 去重保序
+if _refresh_syms:
+    _auto_refresh_prices(_refresh_syms)  # 每个自然日首次进入时刷新一次
 latest = {s: (db.get_runs(conn, ticker=s, limit=1) or [None])[0] for s in symbols}
 
 # 路由从 URL query params 水合：自动刷新走整页 reload 会清空 session_state，
@@ -3236,17 +3249,114 @@ PROVIDER_KEY_ENV = {
 }
 
 
-def _model_choices(provider: str, mode: str, current: str | None) -> list[str]:
-    """按供应商+模式取模型目录；current 不在列表里则置顶。openrouter/异常时回退空表。"""
-    opts: list[str] = []
+def _catalog_models(provider: str, mode: str) -> list[tuple[str, str]]:
+    """该供应商+模式的模型目录 [(value, label)]，排除 'custom' 哨兵。"""
     try:
         from tradingagents.llm_clients.model_catalog import get_model_options
-        opts = [v for _, v in get_model_options(provider, mode) if v and v != "custom"]
-    except Exception:
-        opts = []
-    if current and current not in opts:
-        opts = [current] + opts
-    return opts
+        return [(v, lbl) for lbl, v in get_model_options(provider, mode)
+                if v and v != "custom"]
+    except Exception:  # noqa: BLE001  目录缺失/异常 → 空表(转纯手填)
+        return []
+
+
+def _mask_key(v: str | None) -> str:
+    if not v:
+        return ""
+    return f"{v[:3]}…{v[-4:]}" if len(v) > 10 else "••••"
+
+
+def _upsert_env_var(name: str, value: str) -> None:
+    """把 name=value 写进本机 .env（存在则替换该行，否则追加），并即时生效于当前进程。
+    .env 已在 .gitignore，永不进 git。"""
+    from trading24.config import PROJECT_ROOT
+    env_path = PROJECT_ROOT / ".env"
+    lines = env_path.read_text().splitlines() if env_path.exists() else []
+    pat = re.compile(rf"^\s*{re.escape(name)}\s*=")
+    out, found = [], False
+    for ln in lines:
+        if pat.match(ln):
+            out.append(f"{name}={value}"); found = True
+        else:
+            out.append(ln)
+    if not found:
+        out.append(f"{name}={value}")
+    env_path.write_text("\n".join(out).rstrip("\n") + "\n")
+    os.environ[name] = value
+
+
+def _render_key_input(env_var: str, label: str, help_url: str | None = None) -> None:
+    """一行式密钥输入：状态 + 密码框 + 保存按钮。保存写入 .env 并即时生效。"""
+    cur = os.getenv(env_var, "")
+    status = (f"已配置 · <code>{html_safe(_mask_key(cur))}</code> ✅" if cur
+              else "未配置 ⚠️")
+    st.markdown(
+        f"<div class='t24-muted' style='margin:2px 0 4px;'>{html_safe(label)} "
+        f"<code>{env_var}</code> · {status}</div>",
+        unsafe_allow_html=True)
+    kc = st.columns([3, 1], vertical_alignment="bottom")
+    val = kc[0].text_input(
+        label, type="password", label_visibility="collapsed",
+        placeholder="留空 = 保持不变" if cur else "粘贴密钥后点保存",
+        key=f"keyin_{env_var}")
+    if kc[1].button("保存密钥", key=f"keysave_{env_var}", width="stretch"):
+        if val.strip():
+            _upsert_env_var(env_var, val.strip())
+            st.toast(f"{env_var} 已写入 .env 并生效")
+            st.rerun()
+        else:
+            st.toast("未输入，保持原值")
+    if help_url:
+        st.caption(f"免费申请：{help_url}")
+
+
+def _model_picker(label: str, provider: str, mode: str, saved_model: str | None,
+                  provider_changed: bool, slot: str) -> str:
+    """模型选择：切换供应商时自动回到该供应商默认模型；目录外的自定义 ID 也支持。"""
+    cat = _catalog_models(provider, mode)
+    values = [v for v, _ in cat]
+    labelmap = {v: lbl for v, lbl in cat}
+    seed = "" if provider_changed else (saved_model or "")
+    if not values:  # 无目录(ollama/openai_compatible 等) → 纯手填
+        return st.text_input(label, value=seed, key=f"mdl_txt_{slot}_{provider}",
+                             placeholder="填模型 ID")
+    is_custom = bool(seed) and seed not in values
+    custom = st.checkbox("自定义 ID", key=f"mdl_cust_{slot}_{provider}", value=is_custom)
+    if custom:
+        return st.text_input(label, value=(seed if seed not in values else ""),
+                             key=f"mdl_txt_{slot}_{provider}", placeholder="自定义模型 ID")
+    idx = values.index(seed) if seed in values else 0
+    return st.selectbox(label, values, index=idx,
+                        format_func=lambda v: labelmap.get(v, v),
+                        key=f"mdl_sel_{slot}_{provider}")
+
+
+_TEST_UNSUPPORTED = {"anthropic", "google", "bedrock", "azure"}
+
+
+def _test_llm_connection(provider: str, model: str, backend_url: str | None,
+                         api_key: str | None) -> tuple[bool | None, str]:
+    """对 OpenAI 兼容端点发一个极小请求验证 key+model+url。
+    返回 (True 成功 / False 失败 / None 不适用, 说明)。"""
+    if not api_key:
+        return False, "未配置密钥"
+    if not model:
+        return False, "未选择模型"
+    if provider in _TEST_UNSUPPORTED:
+        return None, "该供应商用原生协议，暂不支持一键测试——保存后跑一次分析验证。"
+    base = (backend_url or PROVIDER_DEFAULT_URL.get(provider) or "").rstrip("/")
+    if not base:
+        return False, "缺少接口地址 backend_url"
+    url = base if base.endswith("/chat/completions") else f"{base}/chat/completions"
+    try:
+        r = httpx.post(
+            url, headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": model, "messages": [{"role": "user", "content": "ping"}],
+                  "max_tokens": 1}, timeout=20)
+        if r.status_code == 200:
+            return True, "连接成功 · 密钥/模型/地址都可用"
+        return False, f"HTTP {r.status_code}：{r.text[:140]}"
+    except Exception as e:  # noqa: BLE001
+        return False, str(e)[:160]
 
 
 def _launchd_installed() -> bool:
@@ -3271,12 +3381,53 @@ def render_settings_dialog() -> None:
             "LLM 供应商", PROVIDER_KEYS, index=prov_idx,
             format_func=lambda k: PROVIDER_LABEL.get(k, k), key="set_provider",
         )
+        provider_changed = provider != s.llm_provider
+        if provider_changed:
+            st.caption(f"已切到 {PROVIDER_LABEL.get(provider, provider)}，"
+                       "下方模型/接口已切换为该供应商默认，密钥填该供应商的；点保存后生效。")
+
+        # API 密钥（写入本机 .env，即时生效）
+        st.markdown("<div class='t24-set-sec'>API 密钥</div>", unsafe_allow_html=True)
+        env_var = PROVIDER_KEY_ENV.get(provider)
+        if env_var:
+            _render_key_input(env_var, f"{PROVIDER_LABEL.get(provider, provider)} 密钥")
+        else:
+            st.caption(f"{PROVIDER_LABEL.get(provider, provider)} 无需密钥"
+                       "（本地/兼容端点，仅需下方接口地址）。")
+        st.caption("🔒 密钥只写入本机 .env，不进 git、不上传。")
+
+        # 模型（跟随供应商）
+        st.markdown("<div class='t24-set-sec'>模型</div>", unsafe_allow_html=True)
         mc = st.columns(2)
         with mc[0]:
-            deep = _model_field("深思考模型", provider, "deep", s.deep_think_llm, "deep")
+            deep = _model_picker("深思考模型", provider, "deep",
+                                 s.deep_think_llm, provider_changed, "deep")
         with mc[1]:
-            quick = _model_field("快思考模型", provider, "quick", s.quick_think_llm, "quick")
+            quick = _model_picker("快思考模型", provider, "quick",
+                                  s.quick_think_llm, provider_changed, "quick")
 
+        default_url = PROVIDER_DEFAULT_URL.get(provider) or ""
+        url_seed = s.backend_url if provider == s.llm_provider else default_url
+        backend_url = st.text_input(
+            "接口地址 backend_url", value=url_seed or "",
+            key=f"set_url_{provider}",
+            placeholder=default_url or "该供应商无需自定义地址",
+        ) or None
+
+        if st.button("测试连接", key="set_test_conn", width="stretch"):
+            with st.spinner("正在验证密钥/模型/地址…"):
+                ok, msg = _test_llm_connection(
+                    provider, quick or deep, backend_url,
+                    os.getenv(env_var) if env_var else None)
+            if ok is True:
+                st.success(msg)
+            elif ok is None:
+                st.info(msg)
+            else:
+                st.error(f"连接失败：{msg}")
+
+        # 分析行为
+        st.markdown("<div class='t24-set-sec'>分析行为</div>", unsafe_allow_html=True)
         dc = st.columns(2)
         with dc[0]:
             depth_vals = [v for _, v in DEPTH_OPTIONS]
@@ -3299,24 +3450,16 @@ def render_settings_dialog() -> None:
             format_func=lambda k: ANALYST_LABEL.get(k, k), key="set_analysts",
         )
 
-        # 密钥状态：当前供应商 + FRED（隐藏硬依赖，缺了新闻分析师会崩整次运行）
-        env_var = PROVIDER_KEY_ENV.get(provider)
-        key_ok = bool(env_var and os.getenv(env_var))
-        fred_ok = bool(os.getenv("FRED_API_KEY"))
-        prov_txt = (f"{env_var}：{'已配置 ✅' if key_ok else '未检测到 ⚠️'}"
-                    if env_var else "该供应商的密钥请在 .env 配置")
-        st.caption(f"🔑 {prov_txt} · FRED_API_KEY：{'已配置 ✅' if fred_ok else '未检测到 ⚠️'}")
-        if "news" in analysts and not fred_ok:
-            st.warning("未检测到 FRED_API_KEY：新闻分析师会调用宏观数据（FRED），"
-                       "整次分析将失败。请在 .env 配置，或暂时移除上方「新闻面」。")
+        # 数据密钥（FRED 是隐藏硬依赖，缺了勾选新闻面会崩整次运行）
+        st.markdown("<div class='t24-set-sec'>数据密钥</div>", unsafe_allow_html=True)
+        _render_key_input("FRED_API_KEY", "FRED 密钥（宏观数据，新闻分析师必需）",
+                          help_url="https://fredaccount.stlouisfed.org/apikey")
+        if "news" in analysts and not os.getenv("FRED_API_KEY"):
+            st.warning("勾了「新闻面」但没配 FRED_API_KEY：新闻分析师会调宏观数据，整次分析会失败。"
+                       "上面填一下密钥，或移除「新闻面」。")
 
-        with st.expander("高级：接口地址与数据源"):
-            default_url = PROVIDER_DEFAULT_URL.get(provider) or ""
-            url_seed = s.backend_url if provider == s.llm_provider else default_url
-            backend_url = st.text_input(
-                "接口地址 backend_url", value=url_seed or "",
-                key=f"set_url_{provider}", placeholder=default_url or "该供应商无需自定义地址",
-            ) or None
+        # 高级：数据源 vendor
+        with st.expander("高级：数据源 vendor"):
             vendors = {}
             vc = st.columns(2)
             for i, (vk, vlabel) in enumerate(VENDOR_FIELDS):
@@ -3326,8 +3469,7 @@ def render_settings_dialog() -> None:
                     vlabel, opts, index=opts.index(cur) if cur in opts else 0,
                     key=f"set_vendor2_{vk}",
                 )
-            st.caption("宏观数据固定走 FRED（必需 FRED_API_KEY）；"
-                       "选 alpha_vantage 需在 .env 配 ALPHA_VANTAGE_API_KEY。")
+            st.caption("宏观数据固定走 FRED；选 alpha_vantage 需配 ALPHA_VANTAGE_API_KEY。")
 
     # ── Tab 2：运行与成本 ───────────────────────────────────
     with tab_ops:
@@ -3349,6 +3491,13 @@ def render_settings_dialog() -> None:
                          if r.status == "success" and run_is_today(r))
         st.caption(f"今日成本 ${today_cost:.2f} / 预算 ${s.cost_budget_usd_per_day:.0f}"
                    f"（约 ${0.1:.2f}/只/次，超预算仅提醒不拦截）")
+
+        st.markdown("<div class='t24-set-sec'>持仓显示</div>", unsafe_allow_html=True)
+        hide_holding = st.toggle(
+            "隐藏持仓金额", value=bool(s.hide_holding_amounts), key="set_hide_holding",
+            help="开启后，持仓面板里的股数/成本/市值/浮亏金额会打码，只保留现价与盈亏百分比；"
+                 "关注列表只显示盈亏%，本就不含金额。设置持久保存。",
+        )
 
         st.markdown("<div class='t24-set-sec'>行情数据</div>", unsafe_allow_html=True)
         st.caption("每天首次打开页面时自动全量刷新一次；盘中需要最新价时手动刷新（免费，不调用 LLM）。")
@@ -3400,6 +3549,7 @@ def render_settings_dialog() -> None:
             price_per_1m_output=price_out,
             notify=dict(s.notify or {}),   # 通知未上线：原样保留 yaml 配置
             analysts=analysts or ["market", "social", "news", "fundamentals"],
+            hide_holding_amounts=bool(hide_holding),
         )
         save_settings(new)
         if clean_time and clean_time != run_time:
@@ -3408,17 +3558,6 @@ def render_settings_dialog() -> None:
         st.rerun()
     if bc[1].button("取消", width="stretch", key="set_cancel"):
         st.rerun()
-
-
-def _model_field(label: str, provider: str, mode: str, current: str | None, slot: str) -> str:
-    """模型选择：优先目录下拉，勾选“自定义”改为手填。"""
-    choices = _model_choices(provider, mode, current)
-    custom = st.checkbox("自定义", key=f"set_model_custom_{slot}_{provider}",
-                         value=not choices)
-    if custom or not choices:
-        return st.text_input(label, value=current or "", key=f"set_model_txt_{slot}_{provider}")
-    idx = choices.index(current) if current in choices else 0
-    return st.selectbox(label, choices, index=idx, key=f"set_model_sel_{slot}_{provider}")
 
 
 def render_market_tape() -> None:
@@ -3450,13 +3589,14 @@ def render_top_nav() -> None:
             vertical_alignment="center",
         )
         nav_cols[0].markdown("<div class='t24-logo'>TRADING24</div>", unsafe_allow_html=True)
+        # 「关注」已并入「分析」页左栏关注列表，故从顶部导航移除；
+        # 关注列表的管理（增删/阈值）改从分析页左栏的「管理」图标进入（?p=watchlist）。
         nav_items = [
             ("Dashboard", "总览", goto_dashboard, icon("overview", 15)),
             ("Analysis", "分析", goto_analysis, icon("analysis", 15)),
             ("Review", "复盘", goto_review, None),
-            ("Watchlist", "关注", goto_watchlist, icon("watch", 15)),
         ]
-        for col, (key, label, handler, _) in zip(nav_cols[1:5], nav_items):
+        for col, (key, label, handler, _) in zip(nav_cols[1:4], nav_items):
             if col.button(label, key=f"topnav_{key}", width="stretch",
                           type="primary" if active == key else "secondary"):
                 handler()
@@ -3603,6 +3743,177 @@ def kpi_row():
     c4.metric("减持信号", sells)
 
 
+RAIL_CSS = """
+<style>
+/* 固定高度＋粘性：列表占满近一屏、超出只在框内滚动；粘性作用在 Streamlit 列容器上（见下方 st-key 规则），
+   让左栏关注列表随主屏滚动而位置跟随（钉在视口顶部），长列表不撑长整页。 */
+.t24-rail{background:var(--t24-surface);border:1px solid var(--t24-border);border-radius:16px;
+  overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 24px);}
+/* 粘性作用在包含关注列表的整个 Streamlit 列上：把该列设为内容高度并 sticky，
+   其所在的行（右侧分析很长）足够高，于是左栏随主屏滚动钉在视口顶部、位置跟随。 */
+[data-testid="stColumn"]:has(.st-key-t24_rail_col){position:sticky;top:12px;align-self:flex-start;z-index:5;}
+.t24-rail-head{padding:13px 15px 11px;border-bottom:1px solid var(--t24-border);display:flex;
+  align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;}
+.t24-rail-head-l{display:flex;align-items:baseline;gap:9px;}
+.t24-rail-title{font-size:14px;font-weight:650;color:var(--t24-text);}
+.t24-rail-count{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:11px;color:var(--t24-subtle);
+  font-variant-numeric:tabular-nums;}
+.t24-rail-edit{display:inline-flex;color:var(--t24-subtle);padding:3px;border-radius:6px;}
+.t24-rail-edit:hover{color:var(--t24-text);background:var(--t24-surface-high);}
+.t24-rail-edit svg{width:15px;height:15px;}
+.t24-rail-list{flex:1;min-height:0;overflow-y:auto;}
+.t24-rail-item,.t24-rail-item:hover,.t24-rail-item *{text-decoration:none !important;}
+.t24-rail-item{display:block;border-bottom:1px solid var(--t24-border);padding:10px 15px;position:relative;
+  color:inherit;}
+.t24-rail-item:hover{background:var(--t24-surface-high);}
+.t24-rail-item.active{background:var(--t24-surface-high);}
+.t24-rail-item.active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--t24-primary);}
+.t24-rail-r1{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.t24-rail-sym{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:13px;font-weight:600;color:var(--t24-text);}
+.t24-rail-px{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:12.5px;color:var(--t24-text);
+  font-variant-numeric:tabular-nums;}
+.t24-rail-r2{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:4px;}
+.t24-rail-name{font-size:11.5px;color:var(--t24-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:145px;}
+.t24-rail-chg{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:11px;font-variant-numeric:tabular-nums;}
+.t24-rail-r3{display:flex;align-items:center;gap:7px;margin-top:8px;}
+.t24-rail-r3 .t24-badge{white-space:nowrap;flex-shrink:0;}
+.t24-rail-hold{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:10px;color:var(--t24-muted);
+  border:1px solid var(--t24-border-strong);border-radius:6px;padding:2px 7px;display:inline-flex;gap:5px;
+  align-items:center;white-space:nowrap;flex-shrink:0;margin-left:auto;font-variant-numeric:tabular-nums;}
+.t24-rail-holddot{width:5px;height:5px;border-radius:50%;background:var(--t24-tertiary);display:inline-block;}
+.t24-up{color:var(--t24-primary);} .t24-down{color:var(--t24-danger);}
+.t24-mask{letter-spacing:.14em;color:var(--t24-subtle);}
+/* 持仓面板（详情页 hero 下方） */
+.t24-holding{margin:10px 0 4px;padding:13px 16px;border-radius:13px;
+  background:color-mix(in srgb,var(--t24-tertiary) 8%,var(--t24-surface-low));
+  border:1px solid color-mix(in srgb,var(--t24-tertiary) 30%,var(--t24-border));
+  display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap;}
+.t24-hold-badge{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:11px;font-weight:600;
+  color:var(--t24-tertiary);display:inline-flex;align-items:center;gap:6px;}
+.t24-hold-badge svg{width:15px;height:15px;}
+.t24-hold-sep{width:1px;align-self:stretch;background:color-mix(in srgb,var(--t24-tertiary) 22%,var(--t24-border));}
+.t24-hold-stat{display:flex;flex-direction:column;gap:3px;}
+.t24-hold-k{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:9.5px;letter-spacing:.05em;
+  text-transform:uppercase;color:var(--t24-subtle);}
+.t24-hold-v{font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:14px;
+  font-variant-numeric:tabular-nums;color:var(--t24-text);}
+.t24-hold-injected{margin-left:auto;font-family:'Geist Mono','SFMono-Regular',Menlo,monospace;font-size:10.5px;
+  color:var(--t24-primary);display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+</style>
+"""
+
+
+def watchlist_rail_html(current_sym: str) -> str:
+    """左栏关注列表：可点行 → 整页导航到该标的分析（与总览卡片同一套 ?p=analysis&t= 导航）。
+    固定高度、框内滚动；行内显示决策芯片与持仓浮盈亏 %。"""
+    try:
+        from trading24 import holdings as _holdings
+        positions = _holdings.load_positions()
+    except Exception:  # noqa: BLE001  持仓读取失败不影响关注列表
+        _holdings, positions = None, []
+
+    # 有持仓的排在前面（稳定排序，组内保持 watchlist 原顺序）
+    pos_map = {s: (_holdings.find_position(s, positions) if _holdings else None) for s in symbols}
+
+    def _is_held(s):
+        p = pos_map.get(s)
+        return bool(p and p.shares)
+
+    ordered = [s for s in symbols if _is_held(s)] + [s for s in symbols if not _is_held(s)]
+    held = sum(1 for s in symbols if _is_held(s))
+    rows = ""
+    for s in ordered:
+        run = latest.get(s)
+        diff, pct = price_delta(s)
+        chg = "—" if (diff is None or pct is None) else f"{'+' if diff >= 0 else ''}{pct:.2f}%"
+        pos = pos_map.get(s)
+        hold = ""
+        if pos and pos.shares:
+            # 盈亏%按持仓自身代码的实时价算，与详情持仓面板一致；取不到才回退截图
+            _live = latest_price_value(pos.symbol)
+            rp = ((_live - pos.avg_cost) / pos.avg_cost * 100
+                  if (_live is not None and pos.avg_cost) else pos.return_pct())
+            if rp is not None:
+                cls = "t24-up" if rp >= 0 else "t24-down"
+                adr = " ADR" if pos.symbol.upper() != str(s).upper() else ""
+                hold = (f"<span class='t24-rail-hold'><i class='t24-rail-holddot'></i>持仓{adr}"
+                        f"<b class='{cls}'>{'+' if rp >= 0 else ''}{rp:.1f}%</b></span>")
+        active = " active" if s == current_sym else ""
+        rows += (
+            f"<a class='t24-rail-item{active}' target='_self' "
+            f"href='?p=analysis&t={quote(str(s), safe='')}'>"
+            f"<div class='t24-rail-r1'><span class='t24-rail-sym'>{html_safe(s)}</span>"
+            f"<span class='t24-rail-px'>{html_safe(price_display(s))}</span></div>"
+            f"<div class='t24-rail-r2'><span class='t24-rail-name'>{html_safe(names.get(s, '') or s)}</span>"
+            f"<span class='t24-rail-chg' style='color:{delta_color(s)};'>{html_safe(chg)}</span></div>"
+            f"<div class='t24-rail-r3'>{badge(run.decision if run else None)}{hold}</div>"
+            f"</a>"
+        )
+    head = (f"<div class='t24-rail-head'>"
+            f"<span class='t24-rail-head-l'><span class='t24-rail-title'>关注列表</span>"
+            f"<span class='t24-rail-count'>{len(symbols)} 只 · 持仓 {held}</span></span>"
+            f"<a class='t24-rail-edit' href='?p=watchlist' target='_self' title='管理关注列表'>{icon('manage', 16)}</a>"
+            f"</div>")
+    return f"{RAIL_CSS}<div class='t24-rail'>{head}<div class='t24-rail-list'>{rows}</div></div>"
+
+
+def holding_panel_html(sym: str, hide_amounts: bool = False) -> str:
+    """详情页 hero 下方的持仓面板：股数/成本/现价/市值/浮动盈亏。无持仓返回空串。
+    现价按「持仓自身代码」的实时快照取（含美股 ADR，按其自身币种），市值/浮盈亏据此实时
+    重算——只有股数、成本是你粘贴的静态值。小米/阿里持 ADR、按港股分析时会标注 ADR 代码。
+    hide_amounts=True（设置项「隐藏持仓金额」）时，金额打码、只保留现价与盈亏%。"""
+    try:
+        from trading24 import holdings as _holdings
+        pos = _holdings.find_position(sym)
+    except Exception:  # noqa: BLE001
+        pos = None
+    if not pos or not pos.shares:
+        return ""
+
+    _mkt = market_of(pos.symbol)
+    _pfx = "$" if _mkt == "us" else "¥" if _mkt == "cn" else "HK$"
+
+    def _money(v):
+        return f"{_pfx}{v:,.2f}" if isinstance(v, (int, float)) else "—"
+
+    # 现价：优先「持仓自身代码」的实时快照（含 ADR，按其自身币种），据此实时重算市值/浮盈亏；
+    # 取不到实时价时回退到粘贴的截图数据。只有 股数、成本 是你粘贴的静态事实。
+    live = latest_price_value(pos.symbol)
+    if live is not None:
+        cur_price, equity = live, pos.shares * live
+        cost_basis = pos.avg_cost * pos.shares if pos.avg_cost is not None else None
+        pnl = (live - pos.avg_cost) * pos.shares if pos.avg_cost is not None else None
+        rp = (pnl / cost_basis * 100) if (pnl is not None and cost_basis) else None
+    else:
+        cur_price, equity, pnl, rp = pos.price, pos.equity, pos.total_return, pos.return_pct()
+
+    mask = "<span class='t24-mask'>••••••</span>"
+    pc = "t24-up" if (rp is not None and rp >= 0) else "t24-down"
+    adr = f"（美股ADR {html_safe(pos.symbol)}）" if pos.symbol.upper() != str(sym).upper() else ""
+    pct_str = f" ({'+' if rp >= 0 else ''}{rp:.1f}%)" if rp is not None else ""
+    money_str = "—"
+    if pnl is not None:
+        money_str = f"{'+' if pnl >= 0 else '−'}{_money(abs(pnl))}"
+    pnl_html = (mask if hide_amounts else html_safe(money_str)) + html_safe(pct_str)
+
+    # (标签, 值, 是否属于「金额」——隐私模式下打码)。现价是公开行情，永不打码。
+    cells = [("股数", f"{pos.shares:g}", True), ("成本", _money(pos.avg_cost), True),
+             ("现价", _money(cur_price), False), ("市值", _money(equity), True)]
+    stat_html = "".join(
+        f"<div class='t24-hold-stat'><span class='t24-hold-k'>{k}</span>"
+        f"<span class='t24-hold-v'>{mask if (hide_amounts and m) else html_safe(v)}</span></div>"
+        for k, v, m in cells)
+    tail = "金额已隐藏 · 已计入分析" if hide_amounts else "已计入本次分析"
+    return (
+        f"<div class='t24-holding'>"
+        f"<span class='t24-hold-badge'>{icon('wallet', 15)}你的持仓{adr}</span>"
+        f"<div class='t24-hold-sep'></div>{stat_html}"
+        f"<div class='t24-hold-stat'><span class='t24-hold-k'>浮动盈亏</span>"
+        f"<span class='t24-hold-v {pc}'>{pnl_html}</span></div>"
+        f"<span class='t24-hold-injected'>{icon('spark', 13)}{tail}</span>"
+        f"</div>")
+
+
 def detail_view(sym):
     # 失败记录重跑：?rerun=<run_id> 触发，复用原记录、不新建决策
     _rq = st.query_params.get("rerun")
@@ -3631,39 +3942,24 @@ def detail_view(sym):
                 st.session_state[key] = False
     shell_left, shell_main = st.columns([.24, .76], gap="large")
     with shell_left:
-        pipeline_html = (
-            "<div class='t24-pipeline'>"
-            f"<div class='t24-pipeline-head'><div class='t24-bento-title' style='margin:0;'>"
-            f"{icon('cpu', 18)}<span>Agent Pipeline</span></div></div>"
-        )
-        for section, label, icn in REPORT_NAV:
-            target = f"t24-report-{REPORT_ANCHORS[section]}"
-            state = "active" if section == "final" else ""
-            pipeline_html += (
-                f"<a class='t24-pipeline-item {state}' href='#{target}' data-target='{target}'>"
-                f"{icon(icn, 17)}<span>{label}</span></a>"
-            )
-        pipeline_html += "</div>"
-        shell_left.markdown(pipeline_html, unsafe_allow_html=True)
+        # 左栏＝关注列表（合并页）：点选任一标的即整页切换到其分析；
+        # 外套 key 容器做「粘性跟随」——随主屏滚动钉在视口顶部
+        with st.container(key="t24_rail_col"):
+            st.markdown(watchlist_rail_html(sym), unsafe_allow_html=True)
 
     with shell_main:
-        if symbols:
-            with st.container(key="t24_analysis_filter"):
-                filter_left, filter_right = st.columns([1.1, .9], vertical_alignment="center")
-                filter_left.markdown(
-                    "<div class='caps caps-field'>分析标的</div>",
-                    unsafe_allow_html=True,
-                )
-                selected_sym = filter_right.selectbox(
-                    "分析标的",
-                    symbols,
-                    index=symbols.index(sym) if sym in symbols else 0,
-                    format_func=search_option_label,
-                    label_visibility="collapsed",
-                    key=f"analysis_symbol_filter_{sym}",
-                )
-                if selected_sym != sym:
-                    goto_analysis(selected_sym)
+        # 标的操作：运行 / 重新分析（右对齐）。未分析→运行分析，已有记录→重新分析
+        run_state = today_run_state(sym)
+        with st.container(key="t24_analysis_actions"):
+            _, act_r = st.columns([1, 0.26], vertical_alignment="center")
+            with act_r:
+                if run_state in ("running", "queued"):
+                    st.button("分析中…", key=f"run_{sym}", width="stretch", disabled=True)
+                # 当天已跑过（成功/失败）→「重新分析」；当天没跑过 →「分析」
+                elif st.button("重新分析" if run_state in ("done", "failed") else "分析",
+                               key=f"run_{sym}", width="stretch", type="primary"):
+                    start_background_analysis(sym)
+                    st.toast(f"开始分析 {sym} · 需几分钟，会调用 LLM")
                     st.rerun()
 
         render_live_analysis_status(sym, r)
@@ -3686,6 +3982,10 @@ def detail_view(sym):
             f"{html_safe(token_cost_text(r))}</div></div></div>"
         )
         st.markdown(hero, unsafe_allow_html=True)
+
+        holding_html = holding_panel_html(sym, hide_amounts=load_settings().hide_holding_amounts)
+        if holding_html:
+            st.markdown(holding_html, unsafe_allow_html=True)
 
         plan_html = plan_strip_html(r)
         if plan_html:

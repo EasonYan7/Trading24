@@ -49,6 +49,13 @@ def _run_streamed(ta, ticker: str, trade_date: str, conn, run_id: int):
         ta._resolve_pending_entries(ticker)
         past_context = ta.memory_log.get_past_context(ticker)
         instrument_context = ta.resolve_instrument_context(ticker, "stock")
+        try:  # 注入投资者真实持仓（有则拼上，无则原样）；失败不阻塞主流程
+            from . import holdings
+            note = holdings.position_note(ticker)
+            if note:
+                instrument_context = f"{instrument_context}\n\n{note}"
+        except Exception:  # noqa: BLE001
+            pass
         init_state = ta.propagator.create_initial_state(
             ticker, trade_date, asset_type="stock",
             past_context=past_context, instrument_context=instrument_context,

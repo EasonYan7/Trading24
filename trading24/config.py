@@ -58,6 +58,7 @@ class Settings:
     price_per_1m_output: float = 1.10
     notify: dict = field(default_factory=dict)
     analysts: list = field(default_factory=lambda: ["market", "social", "news", "fundamentals"])
+    hide_holding_amounts: bool = False  # 隐私：隐藏持仓金额（股数/成本/市值/浮亏金额），只留现价与盈亏%
 
     def to_ta_config(self) -> dict:
         """转成 TradingAgents 的 config（覆盖 DEFAULT_CONFIG 对应键）。"""
@@ -94,6 +95,7 @@ def load_settings() -> Settings:
         price_per_1m_output=raw.get("price_per_1m_output", 1.10),
         notify=raw.get("notify", {}),
         analysts=raw.get("analysts", ["market", "social", "news", "fundamentals"]),
+        hide_holding_amounts=raw.get("hide_holding_amounts", False),
     )
 
 
@@ -113,6 +115,7 @@ def save_settings(s: Settings) -> None:
         "price_per_1m_output": s.price_per_1m_output,
         "notify": s.notify or {},
         "analysts": list(s.analysts or []),
+        "hide_holding_amounts": bool(s.hide_holding_amounts),
     }
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     (CONFIG_DIR / "settings.yaml").write_text(

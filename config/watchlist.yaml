@@ -20,3 +20,11 @@ tickers:
   name: SpaceX
 - symbol: 9988.HK
   name: 阿里巴巴-W
+- symbol: QQQ
+  name: 纳指100ETF
+- symbol: XPEV
+  name: 小鹏汽车
+- symbol: NIO
+  name: 蔚来
+- symbol: RVI
+  name: Robinhood Ventures Fund I
