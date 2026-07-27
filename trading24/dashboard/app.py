@@ -3353,9 +3353,11 @@ def _catalog_models(provider: str, mode: str) -> list[tuple[str, str]]:
 
 
 def _mask_key(v: str | None) -> str:
+    """脱敏显示密钥。保留前 8 位——很多密钥前缀带供应商标识（如 sk-kimi-、sk-proj-），
+    只留 3 位会让不同的密钥看起来一模一样，误以为没保存成功。"""
     if not v:
         return ""
-    return f"{v[:3]}…{v[-4:]}" if len(v) > 10 else "••••"
+    return f"{v[:8]}…{v[-4:]}" if len(v) > 16 else "••••"
 
 
 def _upsert_env_var(name: str, value: str) -> None:
