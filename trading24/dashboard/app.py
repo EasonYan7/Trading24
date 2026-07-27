@@ -3324,6 +3324,15 @@ VENDOR_FIELDS = [
     ("fundamental_data", "基本面数据"),
     ("news_data", "新闻数据"),
 ]
+# 上游只给「自定义模型 ID」的供应商（模型更新快，不内置列表）：
+# 给一个示例 ID 和官方模型列表地址，免得用户对着空框猜。{provider: (示例ID, 文档地址)}
+PROVIDER_MODEL_HINT = {
+    "kimi": ("kimi-k2-0905-preview", "platform.moonshot.cn/docs/pricing"),
+    "ollama": ("llama3.1", "ollama.com/library"),
+    "openai_compatible": ("填你端点支持的模型 ID", "你所用服务的文档"),
+    "azure": ("你的部署名 deployment name", "Azure OpenAI Studio → 部署"),
+    "bedrock": ("anthropic.claude-sonnet-4-20250514-v1:0", "AWS Bedrock 控制台 → 模型访问"),
+}
 PROVIDER_KEY_ENV = {
     "openai": "OPENAI_API_KEY", "deepseek": "DEEPSEEK_API_KEY", "anthropic": "ANTHROPIC_API_KEY",
     "google": "GOOGLE_API_KEY", "xai": "XAI_API_KEY", "qwen": "DASHSCOPE_API_KEY",
@@ -3400,9 +3409,16 @@ def _model_picker(label: str, provider: str, mode: str, saved_model: str | None,
     values = [v for v, _ in cat]
     labelmap = {v: lbl for v, lbl in cat}
     seed = "" if provider_changed else (saved_model or "")
-    if not values:  # 无目录(ollama/openai_compatible 等) → 纯手填
-        return st.text_input(label, value=seed, key=f"mdl_txt_{slot}_{provider}",
-                             placeholder="填模型 ID")
+    if not values:  # 无目录(Kimi/Ollama/OpenAI-compatible 等) → 纯手填
+        # 这类供应商模型更新快，上游只提供「自定义 ID」。给出示例与文档链接，
+        # 否则用户面对一个空框不知道该填什么（换供应商后这里必定是空的）。
+        hint = PROVIDER_MODEL_HINT.get(provider)
+        out = st.text_input(
+            label, value=seed, key=f"mdl_txt_{slot}_{provider}",
+            placeholder=f"填模型 ID，例如 {hint[0]}" if hint else "填模型 ID")
+        if hint and not seed:
+            st.caption(f"该供应商需手填模型 ID（更新较快，未内置列表）。模型列表见 {hint[1]}")
+        return out
     is_custom = bool(seed) and seed not in values
     custom = st.checkbox("自定义 ID", key=f"mdl_cust_{slot}_{provider}", value=is_custom)
     if custom:
@@ -3619,10 +3635,16 @@ def render_settings_dialog() -> None:
         if clean_time and not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", clean_time):
             st.error("运行时间格式请使用 HH:MM，例如 08:30。")
             return
+        # 模型必须填。以前留空会静默沿用上一个供应商的模型 ID，存出
+        # 「Kimi 端点 + DeepSeek 模型名」这种跑不起来的混搭配置。
+        if not deep.strip() or not quick.strip():
+            st.error(f"请填写 {PROVIDER_LABEL.get(provider, provider)} 的深思考/快思考模型 ID"
+                     "（该供应商未内置模型列表，需手填；填完可点「测试连接」验证）。")
+            return
         new = Settings(
             llm_provider=provider,
-            deep_think_llm=deep.strip() or s.deep_think_llm,
-            quick_think_llm=quick.strip() or s.quick_think_llm,
+            deep_think_llm=deep.strip(),
+            quick_think_llm=quick.strip(),
             backend_url=backend_url,
             max_debate_rounds=depth,
             max_risk_discuss_rounds=depth,
