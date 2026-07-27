@@ -19,6 +19,7 @@ class Run:
     cost_usd: float = 0.0
     error: str | None = None
     win_tracked: int = 1
+    pid: int | None = None  # 创建该运行的进程号，用于判断 running 记录是否还有活进程在跑
 
 
 @dataclass

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -38,14 +39,18 @@ def _migrate(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(runs)").fetchall()}
     if "win_tracked" not in cols:
         conn.execute("ALTER TABLE runs ADD COLUMN win_tracked INTEGER DEFAULT 1")
+    if "pid" not in cols:
+        # 记录创建该运行的进程号：看板据此判断某条 running 是否还有活着的进程在跑
+        # （看板重启后的僵尸 vs 定时批量在另一个进程里正常跑着）。旧记录为 NULL。
+        conn.execute("ALTER TABLE runs ADD COLUMN pid INTEGER")
 
 
 # ---- runs ----
 def create_run(conn, ticker, market, trade_date, model) -> int:
     cur = conn.execute(
-        "INSERT INTO runs(ticker, market, trade_date, started_at, status, model) "
-        "VALUES (?,?,?,?, 'running', ?)",
-        (ticker, market, trade_date, now_iso(), model),
+        "INSERT INTO runs(ticker, market, trade_date, started_at, status, model, pid) "
+        "VALUES (?,?,?,?, 'running', ?, ?)",
+        (ticker, market, trade_date, now_iso(), model, os.getpid()),
     )
     conn.commit()
     return cur.lastrowid
@@ -85,9 +90,9 @@ def reset_run(conn, run_id: int, model: str | None = None) -> None:
     不新建决策记录——run_id 及其在历史里的位置保持不变。"""
     conn.execute(
         "UPDATE runs SET status='running', started_at=?, finished_at=NULL, "
-        "error=NULL, decision=NULL, tokens=0, cost_usd=0, model=COALESCE(?, model) "
+        "error=NULL, decision=NULL, tokens=0, cost_usd=0, model=COALESCE(?, model), pid=? "
         "WHERE id=?",
-        (now_iso(), model, run_id),
+        (now_iso(), model, os.getpid(), run_id),
     )
     conn.execute("DELETE FROM reports WHERE run_id=?", (run_id,))
     conn.execute("DELETE FROM decision_params WHERE run_id=?", (run_id,))

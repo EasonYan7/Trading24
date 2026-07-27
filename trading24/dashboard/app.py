@@ -2483,30 +2483,55 @@ def _auto_refresh_prices(symbols: tuple[str, ...]) -> None:
         overlay.empty()
 
 
-_ORPHANS_RECONCILED = False
 _STALE_RUN_MINUTES = 25  # 单只分析正常几分钟；超过判为卡死
+
+
+def _pid_alive(pid: int | None) -> bool:
+    """创建该运行的进程是否还活着。信号 0 只做存在性检查，不真的发信号。"""
+    if not pid:
+        return False
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:  # 进程在、但属于别的用户
+        return True
+    except (TypeError, ValueError, OSError):
+        return False
+    return True
 
 
 def _reconcile_stuck_runs(conn) -> None:
     """回收僵尸/卡死的 running 运行，避免 UI 永远卡在「运行中/取消运行」、报告不出。
-    ① 进程刚启动：DB 里任何 running 都是上个进程留下的死线程（本进程还没起任何分析线程）。
-       这类纯中断没有价值，直接删除，不在历史里留「失败」噪音。
-    ② 同进程内某次 running 超过 _STALE_RUN_MINUTES 分钟 → 判为卡死（LLM/网络卡住），
+
+    判据是「创建该运行的进程还活着吗」（runs.pid），不能靠时间猜：
+    * 不能用「是不是第一次执行脚本」——Streamlit 每次交互都重跑整个脚本，模块级标志
+      会被重置，会把刚点「分析」创建的运行误判成僵尸删掉（记录消失、没有决策历史）。
+    * 也不能用「早于看板进程启动就算僵尸」——每日定时批量跑在另一个进程里，
+      那样会把正在跑的批量任务全删掉。
+    ① 进程已死 → 线程随进程消失，绝不可能再有产出。这类纯中断没有价值，
+       直接删除，不在历史里留「失败」噪音。
+    ② 进程还活着但超过 _STALE_RUN_MINUTES 分钟没跑完 → 判为卡死（LLM/网络卡住），
        标记 failed 以便重跑（可能是真问题，保留可见）。"""
-    global _ORPHANS_RECONCILED
     now = datetime.now(timezone.utc)
     orphans, stale = [], []
-    for r in conn.execute("SELECT id, started_at FROM runs WHERE status='running'").fetchall():
-        if not _ORPHANS_RECONCILED:
-            orphans.append(r["id"])
-            continue
+    for r in conn.execute(
+            "SELECT id, started_at, pid FROM runs WHERE status='running'").fetchall():
         try:
-            age_min = (now - datetime.fromisoformat(r["started_at"])).total_seconds() / 60
+            started = datetime.fromisoformat(r["started_at"])
+            if started.tzinfo is None:  # 兼容早期可能写入的 naive 时间
+                started = started.replace(tzinfo=timezone.utc)
+            age_min = (now - started).total_seconds() / 60
+        except (TypeError, ValueError):
+            age_min = _STALE_RUN_MINUTES + 1  # 时间坏了：按卡死处理，不误删
+        if r["pid"] is None:
+            # 旧记录没存 pid：无法判断归属，只按时间兜底，绝不立即删
             if age_min > _STALE_RUN_MINUTES:
                 stale.append(r["id"])
-        except (TypeError, ValueError):
+        elif not _pid_alive(r["pid"]):
+            orphans.append(r["id"])
+        elif age_min > _STALE_RUN_MINUTES:
             stale.append(r["id"])
-    _ORPHANS_RECONCILED = True
     if orphans:
         db.delete_runs(conn, orphans)  # 删运行+报告
     if stale:
