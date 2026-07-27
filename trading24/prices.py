@@ -1,6 +1,7 @@
 """价格与技术指标：yfinance 取数 + stockstats 算指标 → 落 price_snapshots。"""
 from __future__ import annotations
 
+import math
 import time
 
 import yfinance as yf
@@ -27,10 +28,14 @@ def _fetch_history(ticker: str, period: str = "6mo", retries: int = 3):
 
 
 def _round(v):
+    """数值 → 保留 4 位；缺失值统一成 None。
+    NaN 能被 float() 接受，必须显式拦掉——否则会以 NULL 落库，
+    污染「最新价」（数据源对未结算的当日常返回 NaN）。"""
     try:
-        return round(float(v), 4)
+        f = float(v)
     except (TypeError, ValueError):
         return None
+    return None if math.isnan(f) else round(f, 4)
 
 
 def snapshot(conn, ticker: str, recent_days: int = 120) -> int:
@@ -59,6 +64,10 @@ def snapshot(conn, ticker: str, recent_days: int = 120) -> int:
     n = 0
     for pos in range(start, total):
         row = df.iloc[pos]
+        # 数据源偶尔返回「有成交量、OHLC 为空」的残缺行（当日数据尚未结算时抓取）。
+        # 落库会让它变成该标的的「最新一天」，把最新价顶成空值，看板显示成「—」。
+        if _round(row["close"]) is None:
+            continue
         p = PriceSnapshot(
             ticker=ticker,
             date=str(row[date_col])[:10],

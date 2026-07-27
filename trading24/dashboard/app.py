@@ -2931,21 +2931,26 @@ def market_label(sym: str) -> str:
     return {"us": "NASDAQ", "cn": "CN", "hk": "HKEX"}.get(market_of(sym), "GLOBAL")
 
 
+def _closes(sym: str, need: int = 2) -> list[float]:
+    """最近 need 个「有收盘价」的交易日，从旧到新。
+    数据源偶尔混入空行（当日未结算等），直接取最后一行会读到空值、界面显示「—」，
+    所以这里跳过空行往前找。"""
+    rows = db.get_prices(conn, sym, limit=max(need, 2) + 8)
+    vals = [float(r["close"]) for r in rows if r.get("close") is not None]
+    return vals[-need:]
+
+
 def latest_price_value(sym: str) -> float | None:
-    rows = db.get_prices(conn, sym, limit=1)
-    return float(rows[-1]["close"]) if rows and rows[-1].get("close") is not None else None
+    vals = _closes(sym, 1)
+    return vals[-1] if vals else None
 
 
 def price_delta(sym: str) -> tuple[float | None, float | None]:
-    rows = db.get_prices(conn, sym, limit=2)
-    if len(rows) < 2:
+    vals = _closes(sym, 2)
+    if len(vals) < 2 or vals[-2] == 0:
         return None, None
-    prev = rows[-2].get("close")
-    cur = rows[-1].get("close")
-    if prev in (None, 0) or cur is None:
-        return None, None
-    diff = float(cur) - float(prev)
-    return diff, diff / float(prev) * 100
+    diff = vals[-1] - vals[-2]
+    return diff, diff / vals[-2] * 100
 
 
 def price_display(sym: str) -> str:
